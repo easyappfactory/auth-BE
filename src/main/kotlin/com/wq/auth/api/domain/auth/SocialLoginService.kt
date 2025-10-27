@@ -75,7 +75,6 @@ class SocialLoginService(
 
     }
 
-
     /**
      * 기존 회원을 찾거나 신규 회원을 생성합니다.
      *
