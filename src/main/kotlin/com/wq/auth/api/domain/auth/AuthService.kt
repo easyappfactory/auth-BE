@@ -134,6 +134,8 @@ class AuthService(
             ProviderType.EMAIL,
         )
 
+        //TODO
+        //memberConnector 분리 + 소셜도 사용
         if (existingAuthProvider.isPresent) {
             val linkedMember = existingAuthProvider.get().member
 
