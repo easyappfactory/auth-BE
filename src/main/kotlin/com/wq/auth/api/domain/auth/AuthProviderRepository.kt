@@ -12,7 +12,7 @@ interface AuthProviderRepository : JpaRepository<AuthProviderEntity, Long> {
     fun findByProviderIdAndProviderType(
         providerId: String,
         providerType: ProviderType
-    ): Optional<AuthProviderEntity>
+    ): AuthProviderEntity?
 
     fun findByMember(member: MemberEntity): List<AuthProviderEntity>
 
