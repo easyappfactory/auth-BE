@@ -20,8 +20,8 @@ class MemberController(
     @GetMapping("/api/v1/auth/members/user-info")
     @AuthenticatedApi
     override fun getUserInfo(@AuthenticationPrincipal principalDetail: PrincipalDetails): SuccessResponse<UserInfoResponseDto> {
-        val (nickname, email) = memberService.getUserInfo(principalDetail.opaqueId)
-        val resp = UserInfoResponseDto(nickname, email)
+        val (nickname, email, linkedProviders) = memberService.getUserInfo(principalDetail.opaqueId)
+        val resp = UserInfoResponseDto(nickname, email, linkedProviders)
         return Responses.success(message = "회원 정보 조회 성공", data = resp)
     }
 

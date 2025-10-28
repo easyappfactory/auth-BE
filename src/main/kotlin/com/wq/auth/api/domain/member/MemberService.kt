@@ -16,6 +16,7 @@ class MemberService(
     data class UserInfoResult(
         val nickname: String,
         val email: String,
+        val providers: List<ProviderType>,
     )
 
     @Transactional(readOnly = true)
@@ -28,11 +29,15 @@ class MemberService(
             throw MemberException(MemberExceptionCode.USER_INFO_RETRIEVE_FAILED)
         }
 
+        val email = member.primaryEmail
+        val providers = authProviders.map { it.providerType }
+
         //TODO
-        //전화번호 추가시 수정
+        //전화번호 로그인 추가시 null처리 필요
         return UserInfoResult(
             nickname = member.nickname,
-            email = member.primaryEmail!!
+            email = email!!,
+            providers = providers
         )
     }
 
