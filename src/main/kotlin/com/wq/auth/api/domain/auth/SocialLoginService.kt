@@ -91,10 +91,10 @@ class SocialLoginService(
         authProviderRepository.findByProviderIdAndProviderType(
             oauthUser.providerId,
             providerType
-        )?.let{ existingAuthProvider ->
+        )?.let { existingAuthProvider ->
             log.info { "기존 회원 발견: ${existingAuthProvider.member.opaqueId}" }
             return Pair(existingAuthProvider.member, false)
-        } ?: run{
+        } ?: run {
             // 신규 회원 생성
             log.info { "신규 회원 생성: ${oauthUser.email}" }
             val newMember = MemberEntity.createSocialMember(
@@ -123,16 +123,13 @@ class SocialLoginService(
         oauthUser: OAuthUser,
         providerType: ProviderType
     ) {
-        val existingAuthProvider = authProviderRepository.findByMemberAndProviderType(member, providerType)
-
-        if (existingAuthProvider.isPresent) {
+        authProviderRepository.findByMemberAndProviderType(member, providerType)?.let { authProvider ->
             // 기존 AuthProvider 업데이트
-            val authProvider = existingAuthProvider.get()
             // providerId와 email을 업데이트하는 메서드 호출 (엔티티에 setter 메서드가 있어야 함)
             authProvider.updateProviderInfo(oauthUser.providerId, oauthUser.email)
             authProviderRepository.save(authProvider)
             log.info { "AuthProvider 업데이트 완료: ${member.opaqueId}" }
-        } else {
+        } ?: run {
             // 새로운 AuthProvider 생성
             val authProvider = AuthProviderEntity(
                 member = member,
@@ -143,5 +140,6 @@ class SocialLoginService(
             authProviderRepository.save(authProvider)
             log.info { "AuthProvider 생성 완료: ${member.opaqueId}" }
         }
+
     }
 }
