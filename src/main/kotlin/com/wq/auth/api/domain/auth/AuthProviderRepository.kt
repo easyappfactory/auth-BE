@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import java.util.Optional
 
 interface AuthProviderRepository : JpaRepository<AuthProviderEntity, Long> {
-    fun findByEmailAndProviderType(email: String, providerType: ProviderType): Optional<AuthProviderEntity>
+    fun findByEmailAndProviderType(email: String, providerType: ProviderType): AuthProviderEntity?
 
     fun findByProviderIdAndProviderType(
         providerId: String,
