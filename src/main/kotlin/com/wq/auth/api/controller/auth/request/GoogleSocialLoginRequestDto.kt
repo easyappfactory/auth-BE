@@ -1,6 +1,7 @@
 package com.wq.auth.api.controller.auth.request
 
-import com.wq.auth.api.domain.auth.request.GoogleSocialLoginRequest
+import com.wq.auth.api.domain.auth.entity.ProviderType
+import com.wq.auth.api.domain.auth.request.SocialLoginRequest
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
 
@@ -12,14 +13,8 @@ data class GoogleSocialLoginRequestDto(
 
     @field:NotBlank(message = "codeVerifier는 필수입니다")
     @field:Schema(description = "PKCE 검증용 코드 검증자", example = "NgAfIySigI...IVxKxbmrpg")
-    val codeVerifier: String,
-
-    @field:Schema(
-        description = "리다이렉트 URI (선택사항, 미제공시 properties에 설정된 기본값 사용)", 
-        example = "http://localhost:3000/auth/callback"
-    )
-    val redirectUri: String? = null
+    val codeVerifier: String
 )
 
-fun GoogleSocialLoginRequestDto.toDomain(): GoogleSocialLoginRequest =
-    GoogleSocialLoginRequest(authCode, codeVerifier, redirectUri)
+fun GoogleSocialLoginRequestDto.toDomain(): SocialLoginRequest =
+    SocialLoginRequest(authCode, codeVerifier, null, ProviderType.GOOGLE)

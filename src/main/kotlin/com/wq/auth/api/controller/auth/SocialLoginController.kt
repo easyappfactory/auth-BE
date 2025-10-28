@@ -182,13 +182,8 @@ class SocialLoginController(
         @Valid @RequestBody request: GoogleSocialLoginRequestDto,
         response: HttpServletResponse
     ): SuccessResponse<Void> {
-        val serviceRequest = SocialLoginRequestDto(
-            authCode = request.authCode,
-            codeVerifier = request.codeVerifier,
-            providerType = ProviderType.GOOGLE,
-        )
 
-        val loginResult = socialLoginService.processSocialLogin(serviceRequest.toDomain())
+        val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
         // RefreshToken을 HttpOnly 쿠키에 설정
         setRefreshTokenCookie(response, loginResult.refreshToken)
@@ -261,13 +256,8 @@ class SocialLoginController(
         @Valid @RequestBody request: KakaoSocialLoginRequestDto,
         response: HttpServletResponse
     ): SuccessResponse<Void> {
-        val serviceRequest = SocialLoginRequestDto(
-            authCode = request.authCode,
-            codeVerifier = request.codeVerifier,
-            providerType = ProviderType.KAKAO,
-        )
 
-        val loginResult = socialLoginService.processSocialLogin(serviceRequest.toDomain())
+        val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
         // RefreshToken을 HttpOnly 쿠키에 설정
         setRefreshTokenCookie(response, loginResult.refreshToken)
@@ -342,14 +332,7 @@ class SocialLoginController(
         @Valid @RequestBody request: NaverSocialLoginRequestDto,
         response: HttpServletResponse
     ): SuccessResponse<Void> {
-        val serviceRequest = SocialLoginRequestDto(
-            authCode = request.authCode,
-            codeVerifier = request.codeVerifier,
-            state = request.state,  // 네이버는 state 사용
-            providerType = ProviderType.NAVER,
-        )
-
-        val loginResult = socialLoginService.processSocialLogin(serviceRequest.toDomain())
+        val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
         // RefreshToken을 HttpOnly 쿠키에 설정
         setRefreshTokenCookie(response, loginResult.refreshToken)

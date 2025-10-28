@@ -24,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class SocialLinkService(
-    private val linkProviders: List<LinkProvider>,
+    private val linkProviders: MutableList<LinkProvider>,
+    private val memberConnector: MemberConnector,
     private val memberRepository: MemberRepository,
+    private val authProviderRepository: AuthProviderRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -44,13 +46,25 @@ class SocialLinkService(
             .orElseThrow { MemberException(MemberExceptionCode.MEMBER_NOT_FOUND) }
 
         // Provider별 연동 처리
-        linkProviders.find { it.support(request.providerType) }
+        val oauthUser = linkProviders.find { it.support(request.providerType) }
             ?.processLink(currentMember, request)
             ?: throw SocialLoginException(SocialLoginExceptionCode.UNSUPPORTED_PROVIDER)
 
+        memberConnector.linkAccountInternal(
+            currentMember = currentMember,
+            providerType = request.providerType,
+            providerId = oauthUser.providerId,
+            email = oauthUser.email,
+            findExistingProvider = {
+                authProviderRepository.findByProviderIdAndProviderType(
+                    oauthUser.providerId,
+                    request.providerType
+                )
+            }
+        )
+
         log.info { "소셜 계정 연동 완료: $currentOpaqueId -> ${request.providerType}" }
     }
-
 }
 
 
