@@ -36,7 +36,7 @@ data class SocialLoginRequestDto(
         description = "CSRF 방지용 상태 값 (Naver용 - 선택사항)",
         example = "random_state_string_12345"
     )
-    val state: String? = null,
+    val state: String?,
 
     @field:NotNull(message = "제공자 타입은 필수입니다")
     @field:Schema(description = "소셜 로그인 제공자 타입", example = "GOOGLE", allowableValues = ["GOOGLE", "KAKAO", "NAVER"])

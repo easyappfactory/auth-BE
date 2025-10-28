@@ -1,5 +1,7 @@
 package com.wq.auth.api.controller.auth.request
 
+import com.wq.auth.api.domain.auth.entity.ProviderType
+import com.wq.auth.api.domain.auth.request.SocialLoginRequest
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
 
@@ -13,3 +15,6 @@ data class KakaoSocialLoginRequestDto(
     @field:Schema(description = "PKCE 검증용 코드 검증자 (카카오는 선택사항이지만 보안을 위해 권장)", example = "NgAfIySigI...IVxKxbmrpg")
     val codeVerifier: String
 )
+
+fun KakaoSocialLoginRequestDto.toDomain(): SocialLoginRequest =
+    SocialLoginRequest(authCode, codeVerifier, null, ProviderType.KAKAO)

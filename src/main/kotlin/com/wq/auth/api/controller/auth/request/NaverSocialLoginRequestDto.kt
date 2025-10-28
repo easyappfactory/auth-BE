@@ -1,6 +1,7 @@
 package com.wq.auth.api.controller.auth.request
 
-import com.wq.auth.api.domain.auth.request.NaverSocialLoginRequest
+import com.wq.auth.api.domain.auth.entity.ProviderType
+import com.wq.auth.api.domain.auth.request.SocialLoginRequest
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
 
@@ -19,5 +20,5 @@ data class NaverSocialLoginRequestDto(
     val codeVerifier: String,
 )
 
-fun NaverSocialLoginRequestDto.toDomain(): NaverSocialLoginRequest =
-    NaverSocialLoginRequest(authCode, state, codeVerifier)
+fun NaverSocialLoginRequestDto.toDomain(): SocialLoginRequest =
+    SocialLoginRequest(authCode, codeVerifier, state, ProviderType.NAVER)
