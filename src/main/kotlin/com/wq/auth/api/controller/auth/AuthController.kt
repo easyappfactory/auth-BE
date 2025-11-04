@@ -12,6 +12,7 @@ import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.annotation.PublicApi
 import com.wq.auth.security.jwt.JwtProperties
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.rateLimiter.annotation.RateLimit
 import com.wq.auth.web.common.response.BaseResponse
 import com.wq.auth.web.common.response.FailResponse
 import com.wq.auth.web.common.response.Responses
@@ -29,6 +30,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseCookie
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import java.util.concurrent.TimeUnit
 
 @Tag(name = "인증/인가", description = "로그인, 로그아웃 등 인증/인가 관련 API")
 @RestController
@@ -68,6 +70,7 @@ class AuthController(
             )
         ]
     )
+    @RateLimit(limit = 5, duration = 15, timeUnit = TimeUnit.MINUTES)
     @PostMapping("api/v1/auth/members/email-login")
     @PublicApi
     fun emailLogin(
@@ -157,6 +160,7 @@ class AuthController(
             )
         ]
     )
+    @RateLimit(limit = 5, duration = 10, timeUnit = TimeUnit.MINUTES)
     @AuthenticatedApi
     @PostMapping("/api/v1/auth/link/email-login")
     fun verifyEmailLink(
@@ -186,7 +190,7 @@ class AuthController(
             )
         ]
     )
-
+    @RateLimit(limit = 10, duration = 1, timeUnit = TimeUnit.MINUTES)
     @PostMapping("api/v1/auth/members/logout")
     @PublicApi
     fun logout(
@@ -259,6 +263,7 @@ class AuthController(
             )
         ]
     )
+    @RateLimit(limit = 20, duration = 1, timeUnit = TimeUnit.HOURS)
     @PostMapping("api/v1/auth/members/refresh")
     @PublicApi
     fun refreshAccessToken(
