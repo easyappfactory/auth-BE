@@ -7,6 +7,7 @@ import com.wq.auth.api.domain.auth.SocialLoginService
 import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.annotation.PublicApi
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.rateLimiter.annotation.RateLimit
 import com.wq.auth.web.common.response.FailResponse
 import com.wq.auth.web.common.response.Responses
 import com.wq.auth.web.common.response.SuccessResponse
@@ -24,6 +25,7 @@ import org.springframework.http.ResponseCookie
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 /**
  * 소셜 로그인 컨트롤러
@@ -176,6 +178,7 @@ class SocialLoginController(
             )
         ]
     )
+    @RateLimit(limit = 10, duration = 10, timeUnit = TimeUnit.MINUTES)
     @PublicApi("Google 소셜 로그인")
     @PostMapping("/api/v1/auth/google/login")
     fun googleLogin(
@@ -250,6 +253,7 @@ class SocialLoginController(
             )
         ]
     )
+    @RateLimit(limit = 10, duration = 10, timeUnit = TimeUnit.MINUTES)
     @PublicApi("카카오 소셜 로그인")
     @PostMapping("/api/v1/auth/kakao/login")
     fun kakaoLogin(
@@ -326,6 +330,7 @@ class SocialLoginController(
             )
         ]
     )
+    @RateLimit(limit = 10, duration = 10, timeUnit = TimeUnit.MINUTES)
     @PublicApi("Naver 소셜 로그인")
     @PostMapping("/api/v1/auth/naver/login")
     fun naverLogin(
@@ -395,6 +400,7 @@ class SocialLoginController(
             )
         ]
     )
+    @RateLimit(limit = 5, duration = 10, timeUnit = TimeUnit.MINUTES)
     @AuthenticatedApi
     @PostMapping("/api/v1/auth/link/google")
     fun linkGoogleAccount(
@@ -468,6 +474,7 @@ class SocialLoginController(
             )
         ]
     )
+    @RateLimit(limit = 5, duration = 10, timeUnit = TimeUnit.MINUTES)
     @AuthenticatedApi
     @PostMapping("/api/v1/auth/link/kakao")
     fun linkKakaoAccount(
@@ -541,6 +548,7 @@ class SocialLoginController(
             )
         ]
     )
+    @RateLimit(limit = 5, duration = 10, timeUnit = TimeUnit.MINUTES)
     @AuthenticatedApi
     @PostMapping("/api/v1/auth/link/naver")
     fun linkNaverAccount(

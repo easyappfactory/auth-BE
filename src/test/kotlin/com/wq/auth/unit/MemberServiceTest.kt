@@ -41,7 +41,7 @@ class MemberServiceTest : DescribeSpec({
             whenever(mockMember.nickname).thenReturn(nickname)
             whenever(mockAuthProvider.member).thenReturn(mockMember)
             whenever(mockAuthProvider.providerType).thenReturn(ProviderType.EMAIL)
-            whenever(mockAuthProvider.email).thenReturn(email)
+            whenever(mockMember.primaryEmail).thenReturn(email)
 
             whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(mockMember))
             whenever(authProviderRepository.findByMember(mockMember)).thenReturn(listOf(mockAuthProvider))
@@ -52,44 +52,6 @@ class MemberServiceTest : DescribeSpec({
             // then
             result.nickname shouldBe nickname
             result.email shouldBe email
-
-            verify(memberRepository).findByOpaqueId(opaqueId)
-            verify(authProviderRepository).findByMember(mockMember)
-        }
-
-        it("여러 provider가 있을 때 EMAIL 타입을 우선적으로 선택한다") {
-            // given
-            val opaqueId = "validOpaqueId"
-            val nickname = "testUser"
-            val emailProviderEmail = "test@email.com"
-            val googleProviderEmail = "test@google.com"
-
-            val mockMember = mock<MemberEntity>()
-            val mockEmailProvider = mock<AuthProviderEntity>()
-            val mockGoogleProvider = mock<AuthProviderEntity>()
-
-            whenever(mockMember.opaqueId).thenReturn(opaqueId)
-            whenever(mockMember.nickname).thenReturn(nickname)
-
-            whenever(mockEmailProvider.member).thenReturn(mockMember)
-            whenever(mockEmailProvider.providerType).thenReturn(ProviderType.EMAIL)
-            whenever(mockEmailProvider.email).thenReturn(emailProviderEmail)
-
-            whenever(mockGoogleProvider.member).thenReturn(mockMember)
-            whenever(mockGoogleProvider.providerType).thenReturn(ProviderType.GOOGLE)
-            whenever(mockGoogleProvider.email).thenReturn(googleProviderEmail)
-
-            val authProviders = listOf(mockGoogleProvider, mockEmailProvider)
-
-            whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(mockMember))
-            whenever(authProviderRepository.findByMember(mockMember)).thenReturn(authProviders)
-
-            // when
-            val result = memberService.getUserInfo(opaqueId)
-
-            // then
-            result.nickname shouldBe nickname
-            result.email shouldBe emailProviderEmail
 
             verify(memberRepository).findByOpaqueId(opaqueId)
             verify(authProviderRepository).findByMember(mockMember)
@@ -108,7 +70,7 @@ class MemberServiceTest : DescribeSpec({
             whenever(mockMember.nickname).thenReturn(nickname)
             whenever(mockGoogleProvider.member).thenReturn(mockMember)
             whenever(mockGoogleProvider.providerType).thenReturn(ProviderType.GOOGLE)
-            whenever(mockGoogleProvider.email).thenReturn(googleEmail)
+            whenever(mockMember.primaryEmail).thenReturn(googleEmail)
 
             whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(mockMember))
             whenever(authProviderRepository.findByMember(mockMember)).thenReturn(listOf(mockGoogleProvider))
@@ -137,7 +99,7 @@ class MemberServiceTest : DescribeSpec({
             whenever(mockMember.nickname).thenReturn(nickname)
             whenever(mockNaverProvider.member).thenReturn(mockMember)
             whenever(mockNaverProvider.providerType).thenReturn(ProviderType.NAVER)
-            whenever(mockNaverProvider.email).thenReturn(naverEmail)
+            whenever(mockMember.primaryEmail).thenReturn(naverEmail)
 
             whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(mockMember))
             whenever(authProviderRepository.findByMember(mockMember)).thenReturn(listOf(mockNaverProvider))

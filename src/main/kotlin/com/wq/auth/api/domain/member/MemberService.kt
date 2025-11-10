@@ -1,6 +1,7 @@
 package com.wq.auth.api.domain.member
 
 import com.wq.auth.api.domain.auth.AuthProviderRepository
+import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.member.error.MemberException
 import com.wq.auth.api.domain.member.error.MemberExceptionCode

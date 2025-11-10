@@ -2,17 +2,27 @@ package com.wq.auth.integration
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.wq.auth.api.domain.member.entity.Role
 import com.wq.auth.integration._tnote._TNote
 import com.wq.auth.integration._tnote._TNoteRepository
+import com.wq.auth.security.jwt.JwtProvider
+import com.wq.auth.security.principal.PrincipalDetails
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doNothing
+import org.mockito.kotlin.whenever
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import com.wq.auth.shared.rateLimiter.RateLimiterInterceptor
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.web.servlet.HandlerInterceptor
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -28,8 +38,27 @@ import java.time.ZoneOffset
 class JacksonInstantIntegrationTest(
     private val repo: _TNoteRepository,
     private val mockMvc: MockMvc,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+
+    @MockitoBean
+    private val jwtProvider: JwtProvider,
+
+    @MockitoBean
+    private val rateLimiterInterceptor: RateLimiterInterceptor
+
 ) : StringSpec({
+
+    beforeTest {
+        whenever(rateLimiterInterceptor.preHandle(any(), any(), any())).thenReturn(true)
+
+        // JWT 검증을 통과하도록 설정
+        // validateOrThrow는 void이므로 doNothing 사용
+        doNothing().whenever(jwtProvider).validateOrThrow(any())
+
+        // getOpaqueId와 getRole Mock 설정
+        whenever(jwtProvider.getOpaqueId(any())).thenReturn("opaqueId")
+        whenever(jwtProvider.getRole(any())).thenReturn(Role.MEMBER)
+    }
 
     "UTC Instant가 저장/조회 시 동일하다" {
         // given
@@ -47,10 +76,19 @@ class JacksonInstantIntegrationTest(
         // given
         val utc = Instant.parse("2025-08-12T00:00:00Z")
         val saved = repo.save(_TNote(title = "hello", publishedAt = utc))
+        val accessToken = "valid-access-token"
+
+        val principal = PrincipalDetails(
+            opaqueId = "opaqueId",
+            role = Role.MEMBER
+        )
+
 
         // when
         val res = mockMvc.get("/test-notes/{id}", saved.id!!) {
             accept = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $accessToken")
+            with(user(principal))
         }.andReturn().response
         res.status shouldBe 200
 

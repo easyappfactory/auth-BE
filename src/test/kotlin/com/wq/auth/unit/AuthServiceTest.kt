@@ -6,6 +6,7 @@ import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.auth.AuthProviderRepository
 import com.wq.auth.api.domain.auth.AuthService
+import com.wq.auth.api.domain.auth.MemberConnector
 import com.wq.auth.api.domain.member.MemberRepository
 import com.wq.auth.api.domain.auth.RefreshTokenRepository
 import com.wq.auth.api.domain.auth.entity.RefreshTokenEntity
@@ -33,6 +34,7 @@ class AuthServiceTest : DescribeSpec({
     lateinit var refreshTokenRepository: RefreshTokenRepository
     lateinit var jwtProvider: JwtProvider
     lateinit var nicknameGenerator: NicknameGenerator
+    lateinit var memberConnector: MemberConnector
 
     beforeEach {
         authProviderRepository = mock()
@@ -41,6 +43,7 @@ class AuthServiceTest : DescribeSpec({
         authEmailService = mock()
         jwtProvider = mock()
         nicknameGenerator = mock()
+        memberConnector = mock()
 
         authService = AuthService(
             authEmailService = authEmailService,
@@ -49,6 +52,7 @@ class AuthServiceTest : DescribeSpec({
             refreshTokenRepository = refreshTokenRepository,
             jwtProvider = jwtProvider,
             nicknameGenerator = nicknameGenerator,
+            memberConnector = memberConnector,
         )
     }
 
