@@ -11,7 +11,6 @@ import com.wq.auth.security.principal.PrincipalDetails
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringTestExtension
 import org.mockito.BDDMockito.given
-import org.mockito.Mockito.verify
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -25,11 +24,14 @@ import java.time.Duration
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import com.wq.auth.api.domain.member.entity.Role
+import com.wq.auth.shared.rateLimiter.RateLimiterInterceptor
+import org.mockito.Mockito.*
+import org.mockito.kotlin.whenever
+import org.mockito.kotlin.any
 
 @WebMvcTest(
     controllers = [AuthController::class],
-    //excludeAutoConfiguration = [org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class]
-)
+    properties = ["app.cookie.same-site=Strict"])
 class AuthControllerIntegrationTest : DescribeSpec() {
 
     override fun extensions() = listOf(SpringTestExtension())
@@ -49,8 +51,30 @@ class AuthControllerIntegrationTest : DescribeSpec() {
     @MockitoBean
     lateinit var jwtProvider: JwtProvider
 
+    @MockitoBean
+    lateinit var rateLimiterInterceptor: RateLimiterInterceptor
+
     init {
+
+        beforeTest {
+            reset(authEmailService, authService)
+
+            whenever(rateLimiterInterceptor.preHandle(any(), any(), any())).thenReturn(true)
+
+            // JWT 검증을 통과하도록 설정
+            // validateOrThrow는 void이므로 doNothing 사용
+            doNothing().whenever(jwtProvider).validateOrThrow(any())
+
+            // getOpaqueId와 getRole Mock 설정
+            whenever(jwtProvider.getOpaqueId(any())).thenReturn("opaqueId")
+            whenever(jwtProvider.getRole(any())).thenReturn(Role.MEMBER)
+        }
+
         describe("POST /api/v1/auth/members/refresh") {
+            val principal = PrincipalDetails(
+                opaqueId = "opaqueId",
+                role = Role.MEMBER
+            )
 
             context("Web 클라이언트에서 유효한 요청이 주어졌을 때") {
                 it("성공 응답과 새로운 토큰을 반환해야 한다") {
@@ -81,7 +105,8 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(requestBody)
                             .with(csrf()) //security 우회용
-                            .with(user("testUser").roles("USER"))
+                            //.with(user("testUser").roles("USER"))
+                            .with(user(principal))
                     )
                         //.andDo(print())
                         .andExpect(status().isOk)
@@ -95,7 +120,7 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                             )
                         )
                         .andExpect(header().string("Set-Cookie", Matchers.containsString("HttpOnly")))
-                        .andExpect(header().string("Set-Cookie", Matchers.containsString("SameSite=Lax")))
+                        .andExpect(header().string("Set-Cookie", Matchers.containsString("SameSite=Strict")))
 
                     verify(authService).refreshAccessToken(refreshToken, deviceId)
                 }

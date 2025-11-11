@@ -1,5 +1,6 @@
 package com.wq.auth.shared.config
 
+import com.wq.auth.shared.rateLimiter.RateLimiterInterceptor
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -8,13 +9,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 
 @Configuration
 class WebConfig(
     @Value("\${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173, https://www.growgrammers.store}")
-    private val allowedOrigins: String
+    private val allowedOrigins: String,
+    private val rateLimiterInterceptor: RateLimiterInterceptor
 ) : WebMvcConfigurer {
-    
+
     override fun addCorsMappings(registry: CorsRegistry) {
         val origins = allowedOrigins.split(",").map { it.trim() }.toTypedArray()
 
@@ -26,6 +29,11 @@ class WebConfig(
             .exposedHeaders("Authorization")
             .allowCredentials(true)
             .maxAge(3600)
+    }
+
+    override fun addInterceptors(registry: InterceptorRegistry) {
+        registry.addInterceptor(rateLimiterInterceptor)
+            .addPathPatterns("/api/**")  // API 경로에만 적용
     }
 
     @Bean
