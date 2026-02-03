@@ -5,6 +5,7 @@ import com.wq.auth.security.JwtAuthenticationFilter
 import com.wq.auth.security.JwtAuthenticationEntryPoint
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -49,6 +50,7 @@ class SecurityConfig(
             // 요청 권한 설정
             .authorizeHttpRequests { auth ->
                 auth
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()  // OPTIONS 요청 허용
                     // 공개 엔드포인트 (인증 불필요)
                     .requestMatchers(
                         "/api/v1/auth/members/email-login", // 이메일 로그인
