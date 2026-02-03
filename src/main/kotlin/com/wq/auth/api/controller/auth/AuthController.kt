@@ -93,7 +93,8 @@ class AuthController(
                 .secure(cookieSecure)
                 .path("/")
                 .maxAge(jwtProperties.refreshExp.toSeconds())
-                .sameSite(cookieSameSite)
+                .domain(".easyappfactory.com")  // 모든 서브도메인 포함
+                .sameSite("Lax")  //SSO 리다이렉트 시 쿠키 전송을 위해 Lax 권장
                 .build()
             response.addHeader("Set-Cookie", refreshCookie.toString())
 
