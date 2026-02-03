@@ -585,7 +585,8 @@ class SocialLoginController(
             .secure(cookieSecure)                                  // 환경별 설정 (개발: false, 프로덕션: true)
             .path("/")                                      // 모든 경로에서 쿠키 사용 가능
             .maxAge(Duration.ofDays(14))          // 14일 만료
-            .sameSite(cookieSameSite)                              // CSRF 공격 방지 (Strict/Lax/None)
+            .domain(".easyappfactory.com")  // 모든 서브도메인 포함
+            .sameSite("Lax")  //SSO 리다이렉트 시 쿠키 전송을 위해 Lax 권장                          // CSRF 공격 방지 (Strict/Lax/None)
             .build()
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString())

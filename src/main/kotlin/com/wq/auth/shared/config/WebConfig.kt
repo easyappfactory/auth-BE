@@ -13,7 +13,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 
 @Configuration
 class WebConfig(
-    @Value("\${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173, https://www.growgrammers.store}")
+    @Value("\${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173, https://www.growgrammers.store,https://auth.easyappfactory.com,https://wedding.easyappfactory.com,https://admin-wedding.easyappfactory.com}")
     private val allowedOrigins: String,
     private val rateLimiterInterceptor: RateLimiterInterceptor
 ) : WebMvcConfigurer {
