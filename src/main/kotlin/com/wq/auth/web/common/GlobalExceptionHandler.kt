@@ -20,7 +20,7 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ApiException::class)
-    fun handleApiException(e: ApiException): ResponseEntity<CommonResponse<Nothing>> {
+    fun handleApiException(e: ApiException): ResponseEntity<CommonResponse<Unit>> {
 
         log.error(e.extractExceptionLocation() + e.message)
         val status = HttpStatus.valueOf(e.code.status)
@@ -29,7 +29,7 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AuthorizationDeniedException::class)
-    fun handleAuthorizationDenied(e: AuthorizationDeniedException): ResponseEntity<CommonResponse<Nothing>> {
+    fun handleAuthorizationDenied(e: AuthorizationDeniedException): ResponseEntity<CommonResponse<Unit>> {
         log.warn("[권한 부족] ${e.message}")
         val status = HttpStatus.FORBIDDEN
         val body = CommonResponse.fail(JwtExceptionCode.FORBIDDEN)
@@ -38,7 +38,7 @@ class GlobalExceptionHandler {
 
     // 예상 못 한 예외 처리
     @ExceptionHandler(Exception::class)
-    fun handleUnexpected(e: Exception): ResponseEntity<CommonResponse<Nothing>> {
+    fun handleUnexpected(e: Exception): ResponseEntity<CommonResponse<Unit>> {
         log.error("[예상치 못한 예외 발생] $e")
         val status = HttpStatus.INTERNAL_SERVER_ERROR
         val body = CommonResponse.fail(
