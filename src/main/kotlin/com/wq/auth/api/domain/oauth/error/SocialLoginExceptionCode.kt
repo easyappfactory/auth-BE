@@ -33,6 +33,7 @@ enum class SocialLoginExceptionCode(
     NAVER_INVALID_STATE(400, "유효하지 않은 네이버 state 값입니다"),
 
     // 공통 소셜 로그인 예외
+    INVALID_REDIRECT_URI(400, "허용되지 않은 redirect_uri입니다. 등록된 redirect_uri만 사용할 수 있습니다."),
     UNSUPPORTED_PROVIDER(400, "지원하지 않는 소셜 로그인 제공자입니다"),
     SOCIAL_LOGIN_PROCESSING_ERROR(500, "소셜 로그인 처리 중 오류가 발생했습니다"),
     MEMBER_CREATION_FAILED(500, "소셜 로그인 회원 생성에 실패했습니다"),

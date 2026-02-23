@@ -26,34 +26,41 @@ import org.springframework.web.client.HttpServerErrorException
 @Component
 class GoogleOAuthClient(
     private val googleOAuthProperties: GoogleOAuthProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val redirectUriResolver: OAuthRedirectUriResolver,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
     private val restTemplate = RestTemplate()
 
     /**
      * 인가 코드를 사용하여 액세스 토큰을 획득합니다.
-     * 
+     *
      * @param authorizationCode Google로부터 받은 인가 코드
      * @param codeVerifier PKCE 검증용 코드 검증자
+     * @param requestRedirectUri 요청에 담긴 redirect_uri (있으면 허용 목록 검증 후 사용)
      * @return Google 액세스 토큰
      * @throws SocialLoginException 토큰 획득 실패 시
      */
-    fun getAccessToken(authorizationCode: String, codeVerifier: String): String {
+    fun getAccessToken(
+        authorizationCode: String,
+        codeVerifier: String,
+        requestRedirectUri: String? = null,
+    ): String {
+        val redirectUri = redirectUriResolver.resolve(requestRedirectUri, googleOAuthProperties.redirectUri)
         log.info { "Google 액세스 토큰 요청 시작" }
-        log.info { "redirectUri: ${googleOAuthProperties.redirectUri}" }
-        
+        log.info { "redirectUri: $redirectUri" }
+
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_FORM_URLENCODED
         }
-        
+
         val body: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
             add("client_id", googleOAuthProperties.clientId)
             add("client_secret", googleOAuthProperties.clientSecret)
             add("code", authorizationCode)
             add("grant_type", "authorization_code")
             add("code_verifier", codeVerifier)
-            add("redirect_uri", googleOAuthProperties.redirectUri)
+            add("redirect_uri", redirectUri)
         }
         
         val request = HttpEntity(body, headers)
@@ -150,8 +157,8 @@ class GoogleOAuthClient(
      * @param codeVerifier PKCE 검증용 코드 검증자
      * @return 도메인 사용자 정보
      */
-    override fun getUserFromAuthCode(req : OAuthAuthCodeRequest): OAuthUser {
-        val accessToken = getAccessToken(req.authCode, req.codeVerifier)
+    override fun getUserFromAuthCode(req: OAuthAuthCodeRequest): OAuthUser {
+        val accessToken = getAccessToken(req.authCode, req.codeVerifier, req.redirectUri)
         val googleUserInfo = getUserInfo(accessToken)
         
         return OAuthUser(
@@ -172,7 +179,7 @@ class GoogleOAuthClient(
      * @return Google 사용자 정보
      */
     fun getUserInfoFromAuthCode(authorizationCode: String, codeVerifier: String): GoogleUserInfoResponse {
-        val accessToken = getAccessToken(authorizationCode, codeVerifier)
+        val accessToken = getAccessToken(authorizationCode, codeVerifier, null)
         return getUserInfo(accessToken)
     }
 }

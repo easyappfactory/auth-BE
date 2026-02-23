@@ -5,7 +5,6 @@ import com.wq.auth.api.domain.auth.entity.AuthProviderEntity
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.auth.entity.RefreshTokenEntity
-import com.wq.auth.api.domain.member.entity.Role
 import com.wq.auth.api.domain.auth.error.AuthException
 import com.wq.auth.api.domain.auth.error.AuthExceptionCode
 import com.wq.auth.api.domain.auth.request.EmailLoginLinkRequest
@@ -51,7 +50,6 @@ class AuthService(
                 val accessToken =
                     jwtProvider.createAccessToken(
                         opaqueId = existingUser.opaqueId,
-                        role = Role.MEMBER,
                         extraClaims = mapOf("deviceId" to deviceId)
                     )
 
@@ -100,7 +98,6 @@ class AuthService(
 
         val accessToken = jwtProvider.createAccessToken(
             opaqueId = member.opaqueId,
-            role = Role.MEMBER,
             extraClaims = mapOf("deviceId" to deviceId)
         )
         val refreshToken = jwtProvider.createRefreshToken(opaqueId = member.opaqueId)
@@ -195,7 +192,6 @@ class AuthService(
         // AccessToken, RefreshToken 재발급
         val newAccessToken = jwtProvider.createAccessToken(
             opaqueId = opaqueId,
-            role = Role.MEMBER,
             extraClaims = mapOf("deviceId" to deviceId)
         )
         val newRefreshToken = jwtProvider.createRefreshToken(opaqueId = opaqueId)

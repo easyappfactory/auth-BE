@@ -13,10 +13,12 @@ import com.wq.auth.api.domain.auth.entity.ProviderType
  * @param codeVerifier PKCE 검증용 코드 검증자
  * @param state CSRF 방지용 상태 값 (Naver용 - 선택사항)
  * @param providerType 소셜 로그인 제공자 타입
+ * @param redirectUri 인가 요청 시 사용한 redirect_uri. 토큰 교환 시 동일 값 사용. 없으면 서버 기본값 사용.
  */
 data class SocialLoginRequest(
     val authCode: String,
     val codeVerifier: String,
     val state: String?,
     val providerType: ProviderType,
+    val redirectUri: String? = null,
 )

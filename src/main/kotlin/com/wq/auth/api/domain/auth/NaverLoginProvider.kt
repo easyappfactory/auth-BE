@@ -20,7 +20,8 @@ class NaverLoginProvider(
             OAuthAuthCodeRequest(
                 authCode = request.authCode,
                 state = request.state!!,      // 네이버는 state 사용
-                codeVerifier = request.codeVerifier
+                codeVerifier = request.codeVerifier,
+                redirectUri = request.redirectUri,
             )
         )
     }

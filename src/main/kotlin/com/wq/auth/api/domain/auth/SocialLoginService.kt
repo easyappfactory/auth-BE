@@ -58,7 +58,7 @@ class SocialLoginService(
         member.lastLoginAt = LocalDateTime.now()
         memberRepository.save(member)
 
-        val accessToken = jwtProvider.createAccessToken(member.opaqueId, member.role)
+        val accessToken = jwtProvider.createAccessToken(member.opaqueId)
         val refreshToken = jwtProvider.createRefreshToken(member.opaqueId)
 
         val jti = jwtProvider.getJti(refreshToken)

@@ -8,15 +8,13 @@ import com.wq.auth.api.controller.auth.response.LoginResponseDto
 import com.wq.auth.api.controller.auth.response.RefreshAccessTokenResponseDto
 import com.wq.auth.api.domain.auth.AuthService
 import com.wq.auth.api.domain.email.AuthEmailService
+import com.wq.auth.api.domain.member.MemberService
 import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.annotation.PublicApi
 import com.wq.auth.security.jwt.JwtProperties
 import com.wq.auth.security.principal.PrincipalDetails
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.BaseResponse
-import com.wq.auth.web.common.response.FailResponse
-import com.wq.auth.web.common.response.Responses
-import com.wq.auth.web.common.response.SuccessResponse
+import com.wq.auth.web.common.response.CommonResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -37,6 +35,7 @@ import java.util.concurrent.TimeUnit
 class AuthController(
     private val authService: AuthService,
     private val emailService: AuthEmailService,
+    private val memberService: MemberService,
     private val jwtProperties: JwtProperties,
 
     @Value("\${app.cookie.secure:false}")
@@ -56,29 +55,29 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그인 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "이메일 인증 실패",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "회원 정보를 저장하는데 실패했습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
     @RateLimit(limit = 5, duration = 15, timeUnit = TimeUnit.MINUTES)
-    @PostMapping("api/v1/auth/members/email-login")
+    @PostMapping("/api/v1/auth/members/email-login")
     @PublicApi
     fun emailLogin(
         response: HttpServletResponse,
         @RequestHeader("X-Client-Type", required = true) clientType: String,
         @RequestBody req: EmailLoginRequestDto,
 
-        ): SuccessResponse<LoginResponseDto> {
+        ): CommonResponse<LoginResponseDto> {
         emailService.verifyCode(req.email, req.verifyCode)
         val (accessToken, newRefreshToken) = authService.emailLogin(
             req.email,
@@ -98,14 +97,14 @@ class AuthController(
                 .build()
             response.addHeader("Set-Cookie", refreshCookie.toString())
 
-            return Responses.success(message = "로그인에 성공했습니다.", data = null)
+            return CommonResponse.success(message = "로그인에 성공했습니다.", data = null)
         }
 
         //앱
         val resp = LoginResponseDto.forApp(
             refreshToken = newRefreshToken
         )
-        return Responses.success(message = "로그인에 성공했습니다.", data = resp)
+        return CommonResponse.success(message = "로그인에 성공했습니다.", data = resp)
     }
 
 
@@ -142,22 +141,22 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "이메일 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인증 코드가 존재하지 않거나, 만료되었거나, 일치하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -167,9 +166,9 @@ class AuthController(
     fun verifyEmailLink(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: EmailLoginLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         authService.processEmailLoginLink(principalDetail.opaqueId, request.toDomain())
-        return Responses.success("이메일 계정이 성공적으로 연동되었습니다.")
+        return CommonResponse.success("이메일 계정이 성공적으로 연동되었습니다.")
     }
 
     @Operation(
@@ -182,24 +181,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그아웃 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "로그아웃에 실패했습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
     @RateLimit(limit = 10, duration = 1, timeUnit = TimeUnit.MINUTES)
-    @PostMapping("api/v1/auth/members/logout")
+    @PostMapping("/api/v1/auth/members/logout")
     @PublicApi
     fun logout(
         @CookieValue(name = "refreshToken", required = false) refreshToken: String?,
         response: HttpServletResponse,
         @RequestHeader(name = "X-Client-Type", required = true) clientType: String,
         @RequestBody req: LogoutRequestDto?
-    ): SuccessResponse<Void?> {
+    ): CommonResponse<Void?> {
 
         val currentRefreshToken = when (clientType) {
             "web" -> refreshToken
@@ -221,7 +220,7 @@ class AuthController(
 
         }
         //앱
-        return Responses.success(message = "로그아웃에 성공했습니다.", data = null)
+        return CommonResponse.success(message = "로그아웃에 성공했습니다.", data = null)
     }
 
     @Operation(
@@ -243,7 +242,7 @@ class AuthController(
                 description = "잘못된 요청, 인증 토큰이 없음, Authorization 헤더는 'Bearer <token>' 형식이어야 합니다.",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = BaseResponse::class)
+                    schema = Schema(implementation = CommonResponse::class)
                 )]
             ),
             ApiResponse(
@@ -251,7 +250,7 @@ class AuthController(
                 description = "유효하지 않은 토큰, 만료된 토큰, 유효하지 않은 서명, 지원되지 않는 토큰",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = BaseResponse::class)
+                    schema = Schema(implementation = CommonResponse::class)
                 )]
             ),
             ApiResponse(
@@ -259,21 +258,21 @@ class AuthController(
                 description = "refreshToken 조회 실패",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = BaseResponse::class)
+                    schema = Schema(implementation = CommonResponse::class)
                 )]
             )
         ]
     )
     @RateLimit(limit = 20, duration = 1, timeUnit = TimeUnit.HOURS)
-    @PostMapping("api/v1/auth/members/refresh")
+    @PostMapping("/api/v1/auth/members/refresh")
     @PublicApi
     fun refreshAccessToken(
         @CookieValue(name = "refreshToken", required = false) refreshToken: String,
         @RequestHeader("X-Client-Type") clientType: String,
         response: HttpServletResponse,
         @RequestBody req: RefreshAccessTokenRequestDto?,
-    ): SuccessResponse<RefreshAccessTokenResponseDto> {
-        
+    ): CommonResponse<RefreshAccessTokenResponseDto> {
+
         val currentRefreshToken : String?
         if(clientType == "web") {
             currentRefreshToken = refreshToken
@@ -295,16 +294,50 @@ class AuthController(
                 .sameSite(cookieSameSite)
                 .build()
             response.addHeader("Set-Cookie", refreshCookie.toString())
-            
-            return Responses.success(message = "AccessToken 재발급에 성공했습니다.", data = null)
+
+            return CommonResponse.success(message = "AccessToken 재발급에 성공했습니다.", data = null)
         }
-        
+
         //앱
         val resp = RefreshAccessTokenResponseDto.forApp(
             refreshToken = newRefreshToken
         )
-        return Responses.success(message = "AccessToken 재발급에 성공했습니다.", data = resp)
+        return CommonResponse.success(message = "AccessToken 재발급에 성공했습니다.", data = resp)
 
     }
 
+    @Operation(
+        summary = "토큰 인트로스펙트",
+        description = """
+            API Gateway 연동용. Authorization 헤더의 JWT를 검증하고, 성공 시 응답 헤더에 다음을 담아 반환합니다.
+            - X-User-Id: 사용자 UUID (opaqueId)
+            - X-Auth-Provider: 대표 연동 제공자 (EMAIL, GOOGLE, KAKAO, NAVER 중 하나, 연동된 경우)
+        """
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "인트로스펙트 성공 (X-User-Id, X-Auth-Provider 헤더 포함)",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "인증되지 않은 사용자",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
+            )
+        ]
+    )
+    @RateLimit(limit = 60, duration = 1, timeUnit = TimeUnit.MINUTES)
+    @AuthenticatedApi
+    @GetMapping("/api/v1/auth/introspect")
+    fun introspect(
+        response: HttpServletResponse,
+        @AuthenticationPrincipal principalDetails: PrincipalDetails
+    ) {
+        response.setHeader("X-User-Id", principalDetails.opaqueId)
+        memberService.getPrimaryProvider(principalDetails.opaqueId)?.let { provider ->
+            response.setHeader("X-Auth-Provider", provider.name)
+        }
+    }
 }

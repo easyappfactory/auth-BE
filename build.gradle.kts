@@ -27,7 +27,7 @@ repositories {
 
 extra["spring-security.version"] = "6.5.3"
 
-dependencies {
+	dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-security")
@@ -74,6 +74,9 @@ dependencies {
 
 	//rate limiter - token bucket
 	implementation("com.bucket4j:bucket4j-core:8.7.0")
+
+	// UUID v7 생성 (time-ordered UUID)
+	implementation("com.github.f4b6a3:uuid-creator:6.0.0")
 }
 
 kotlin {

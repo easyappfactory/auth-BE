@@ -1,8 +1,8 @@
 package com.wq.auth.security.jwt
 
-import com.wq.auth.api.domain.member.entity.Role
 import com.wq.auth.security.jwt.error.JwtException
 import com.wq.auth.security.jwt.error.JwtExceptionCode
+import com.github.f4b6a3.uuid.UuidCreator
 import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.MalformedJwtException
@@ -25,7 +25,7 @@ class JwtProvider(
 
     fun createAccessToken(
         opaqueId: String,
-        role: Role
+        extraClaims: Map<String, Any?> = emptyMap()
     ): String {
         val now = Instant.now()
         val exp = Date.from(now.plus(jwtProperties.accessExp))
@@ -34,24 +34,6 @@ class JwtProvider(
             .subject(opaqueId)
             .issuedAt(Date.from(now))
             .expiration(exp)
-            .claim("role", role.toString())
-            .signWith(key, Jwts.SIG.HS256)
-            .compact()
-    }
-
-    fun createAccessToken(
-        opaqueId: String,
-        role: Role,
-        extraClaims: Map<String, Any?>
-    ): String {
-        val now = Instant.now()
-        val exp = Date.from(now.plus(jwtProperties.accessExp))
-
-        return Jwts.builder()
-            .subject(opaqueId)
-            .issuedAt(Date.from(now))
-            .expiration(exp)
-            .claim("role", role.toString())
             .apply {
                 extraClaims.forEach { (key, value) ->
                     claim(key, value)
@@ -63,7 +45,7 @@ class JwtProvider(
 
     fun createRefreshToken(
         opaqueId: String,
-        jti: String = UUID.randomUUID().toString()
+        jti: String = UuidCreator.getTimeOrdered().toString()
     ): String {
         val now = Instant.now()
         val exp = Date.from(now.plus(jwtProperties.refreshExp))
@@ -87,20 +69,6 @@ class JwtProvider(
             .build().parseSignedClaims(token)
             .payload
             .subject
-
-    /**
-     * JWT 토큰에서 role을 추출합니다.
-     * @param token 대상 JWT 토큰
-     * @return 사용자의 역할 (MEMBER, ADMIN 등)
-     */
-    fun getRole(token: String): Role? {
-        val roleString = Jwts.parser().verifyWith(key)
-            .build().parseSignedClaims(token)
-            .payload
-            .get("role", String::class.java)
-        
-        return roleString?.let { Role.valueOf(it) }
-    }
 
     /**
      * JWT 토큰에서 jti(ID)를 추출합니다.

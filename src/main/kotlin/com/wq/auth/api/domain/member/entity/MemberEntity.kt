@@ -1,9 +1,9 @@
 package com.wq.auth.api.domain.member.entity
 
 import com.wq.auth.shared.entity.BaseEntity
+import com.github.f4b6a3.uuid.UuidCreator
 import jakarta.persistence.*
 import java.time.LocalDateTime
-import java.util.*
 
 @Entity
 @Table(
@@ -29,10 +29,6 @@ open class MemberEntity protected constructor(
     @Column(nullable = false, length = 100)
     var nickname: String,
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    val role: Role = Role.MEMBER,
-
     @Column(name = "is_email_verified", nullable = false)
     var isEmailVerified: Boolean = false,
 
@@ -53,21 +49,19 @@ open class MemberEntity protected constructor(
                 nickname = nickname,
                 isEmailVerified = true,
                 primaryEmail = email,
-                opaqueId = UUID.randomUUID().toString(),
+                opaqueId = UuidCreator.getTimeOrdered().toString(),
                 lastLoginAt = LocalDateTime.now(),
             )
 
         fun create(
             nickname: String,
-            role: Role = Role.MEMBER
         ): MemberEntity {
             require(nickname.isNotBlank()) { "닉네임은 필수입니다" }
             require(nickname.length <= 100) { "닉네임은 100자를 초과할 수 없습니다" }
 
             return MemberEntity(
-                opaqueId = UUID.randomUUID().toString(),
+                opaqueId = UuidCreator.getTimeOrdered().toString(),
                 nickname = nickname.trim(),
-                role = role
             )
         }
 
@@ -75,15 +69,13 @@ open class MemberEntity protected constructor(
             nickname: String,
             isEmailVerified: Boolean = true,
             primaryEmail: String,
-            role: Role = Role.MEMBER
         ): MemberEntity {
             require(nickname.isNotBlank()) { "닉네임은 필수입니다" }
             require(nickname.length <= 100) { "닉네임은 100자를 초과할 수 없습니다" }
 
             return MemberEntity(
-                opaqueId = UUID.randomUUID().toString(),
+                opaqueId = UuidCreator.getTimeOrdered().toString(),
                 nickname = nickname.trim(),
-                role = role,
                 isEmailVerified = isEmailVerified,
                 primaryEmail = primaryEmail
             )
@@ -112,12 +104,7 @@ open class MemberEntity protected constructor(
         this.isDeleted = true
     }
 
-    /**
-     * 관리자 권한 확인
-     */
-    fun isAdmin(): Boolean = role == Role.ADMIN
-
     override fun toString(): String {
-        return "MemberEntity(id=$id, opaqueId='$opaqueId', nickname='$nickname', role=$role)"
+        return "MemberEntity(id=$id, opaqueId='$opaqueId', nickname='$nickname')"
     }
 }

@@ -26,6 +26,9 @@ springdoc:
   swagger-ui:
     path: ${SWAGGER_PATH}
 
+server:
+  port: 9000
+
 app:
   time:
     default-zone: ${APP_DEFAULT_ZONE:Asia/Seoul}

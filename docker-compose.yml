@@ -1,0 +1,28 @@
+services:
+  auth-be:
+    image: ${DOCKERHUB_USERNAME}/auth-server:latest
+    container_name: auth-be
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    env_file:
+      - env/auth-be.env
+    networks:
+      - app-network
+
+  api-gateway:
+    image: ${DOCKERHUB_USERNAME}/api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - env/api-gateway.env
+    depends_on:
+      - auth-be
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

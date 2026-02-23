@@ -26,34 +26,41 @@ import org.springframework.web.client.HttpServerErrorException
 @Component
 class KakaoOAuthClient(
     private val kakaoOAuthProperties: KakaoOAuthProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val redirectUriResolver: OAuthRedirectUriResolver,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
     private val restTemplate = RestTemplate()
 
     /**
      * 인가 코드를 사용하여 액세스 토큰을 획득합니다.
-     * 
+     *
      * @param authorizationCode 카카오로부터 받은 인가 코드
      * @param codeVerifier PKCE 검증용 코드 검증자 (카카오는 선택사항)
+     * @param requestRedirectUri 요청에 담긴 redirect_uri (있으면 허용 목록 검증 후 사용)
      * @return 카카오 액세스 토큰
      * @throws SocialLoginException 토큰 획득 실패 시
      */
-    fun getAccessToken(authorizationCode: String, codeVerifier: String): String {
+    fun getAccessToken(
+        authorizationCode: String,
+        codeVerifier: String,
+        requestRedirectUri: String? = null,
+    ): String {
+        val redirectUri = redirectUriResolver.resolve(requestRedirectUri, kakaoOAuthProperties.redirectUri)
         log.info { "카카오 액세스 토큰 요청 시작" }
-        log.info { "redirectUri: ${kakaoOAuthProperties.redirectUri}" }
-        
+        log.info { "redirectUri: $redirectUri" }
+
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_FORM_URLENCODED
         }
-        
+
         val body: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "authorization_code")
             add("client_id", kakaoOAuthProperties.clientId)
             if (!kakaoOAuthProperties.clientSecret.isNullOrBlank()) {
                 add("client_secret", kakaoOAuthProperties.clientSecret)
             }
-            add("redirect_uri", kakaoOAuthProperties.redirectUri)
+            add("redirect_uri", redirectUri)
             add("code", authorizationCode)
             // 카카오는 PKCE를 지원하지만 선택사항이므로 codeVerifier가 있을 때만 추가
             if (codeVerifier.isNotBlank()) {
@@ -156,8 +163,8 @@ class KakaoOAuthClient(
      * @param codeVerifier PKCE 검증용 코드 검증자 (카카오는 선택사항)
      * @return 도메인 사용자 정보
      */
-    override fun getUserFromAuthCode(req : OAuthAuthCodeRequest): OAuthUser {
-        val accessToken = getAccessToken(req.authCode, req.codeVerifier)
+    override fun getUserFromAuthCode(req: OAuthAuthCodeRequest): OAuthUser {
+        val accessToken = getAccessToken(req.authCode, req.codeVerifier, req.redirectUri)
         val kakaoUserInfo = getUserInfo(accessToken)
         
         return OAuthUser(
@@ -178,7 +185,7 @@ class KakaoOAuthClient(
      * @return 카카오 사용자 정보
      */
     fun getUserInfoFromAuthCode(authorizationCode: String, codeVerifier: String): KakaoUserInfoResponse {
-        val accessToken = getAccessToken(authorizationCode, codeVerifier)
+        val accessToken = getAccessToken(authorizationCode, codeVerifier, null)
         return getUserInfo(accessToken)
     }
 }

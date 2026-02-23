@@ -8,9 +8,7 @@ import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.annotation.PublicApi
 import com.wq.auth.security.principal.PrincipalDetails
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.FailResponse
-import com.wq.auth.web.common.response.Responses
-import com.wq.auth.web.common.response.SuccessResponse
+import com.wq.auth.web.common.response.CommonResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -84,22 +82,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "잘못된 요청 (필수 필드 누락, 잘못된 형식 등)",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "소셜 제공자 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -108,7 +106,7 @@ class SocialLoginController(
     fun socialLogin(
         @Valid @RequestBody request: SocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
         // RefreshToken을 HttpOnly 쿠키에 설정
@@ -117,7 +115,7 @@ class SocialLoginController(
         // Authorization 헤더에 AccessToken 설정
         response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
 
-        return Responses.success("소셜 로그인이 완료되었습니다")
+        return CommonResponse.success("소셜 로그인이 완료되었습니다")
     }
 
     /**
@@ -159,22 +157,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "Google 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Google 인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "Google API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -184,7 +182,7 @@ class SocialLoginController(
     fun googleLogin(
         @Valid @RequestBody request: GoogleSocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
 
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
@@ -194,7 +192,7 @@ class SocialLoginController(
         // Authorization 헤더에 AccessToken 설정
         response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
 
-        return Responses.success("Google 로그인이 완료되었습니다")
+        return CommonResponse.success("Google 로그인이 완료되었습니다")
     }
 
     /**
@@ -234,22 +232,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "카카오 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "카카오 인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "카카오 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -259,7 +257,7 @@ class SocialLoginController(
     fun kakaoLogin(
         @Valid @RequestBody request: KakaoSocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
 
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
@@ -269,7 +267,7 @@ class SocialLoginController(
         // Authorization 헤더에 AccessToken 설정
         response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
 
-        return Responses.success("카카오 로그인이 완료되었습니다")
+        return CommonResponse.success("카카오 로그인이 완료되었습니다")
     }
 
     /**
@@ -311,22 +309,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "Naver 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Naver 인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "Naver API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -336,7 +334,7 @@ class SocialLoginController(
     fun naverLogin(
         @Valid @RequestBody request: NaverSocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
         // RefreshToken을 HttpOnly 쿠키에 설정
@@ -345,7 +343,7 @@ class SocialLoginController(
         // Authorization 헤더에 AccessToken 설정
         response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
 
-        return Responses.success("Naver 로그인이 완료되었습니다")
+        return CommonResponse.success("Naver 로그인이 완료되었습니다")
     }
 
     /**
@@ -381,22 +379,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "Google 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자 또는 Google 인가 코드가 유효하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "Google API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -406,16 +404,17 @@ class SocialLoginController(
     fun linkGoogleAccount(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: GoogleSocialLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val serviceRequest = SocialLinkRequestDto(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             providerType = ProviderType.GOOGLE,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
 
-        return Responses.success("Google 계정 연동이 완료되었습니다")
+        return CommonResponse.success("Google 계정 연동이 완료되었습니다")
     }
 
     /**
@@ -455,22 +454,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "카카오 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자 또는 카카오 인가 코드가 유효하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "카카오 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -480,16 +479,17 @@ class SocialLoginController(
     fun linkKakaoAccount(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: KakaoSocialLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val serviceRequest = SocialLinkRequestDto(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             providerType = ProviderType.KAKAO,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
 
-        return Responses.success("카카오 계정 연동이 완료되었습니다")
+        return CommonResponse.success("카카오 계정 연동이 완료되었습니다")
     }
 
     /**
@@ -529,22 +529,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "네이버 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 또는 state 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자 또는 네이버 인가 코드가 유효하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "네이버 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -554,17 +554,18 @@ class SocialLoginController(
     fun linkNaverAccount(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: NaverSocialLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val serviceRequest = SocialLinkRequestDto(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             state = request.state,
             providerType = ProviderType.NAVER,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
 
-        return Responses.success("네이버 계정 연동이 완료되었습니다")
+        return CommonResponse.success("네이버 계정 연동이 완료되었습니다")
     }
 
     /**

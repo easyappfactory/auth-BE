@@ -26,7 +26,8 @@ class NaverLinkProvider(
         val authCodeRequest = OAuthAuthCodeRequest(
             authCode = linkRequest.authCode,
             codeVerifier = linkRequest.codeVerifier,
-            state = linkRequest.state
+            state = linkRequest.state,
+            redirectUri = linkRequest.redirectUri,
         )
 
         return naverOAuthClient.getUserFromAuthCode(authCodeRequest)

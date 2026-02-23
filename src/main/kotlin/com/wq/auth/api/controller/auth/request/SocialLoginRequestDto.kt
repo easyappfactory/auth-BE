@@ -42,8 +42,10 @@ data class SocialLoginRequestDto(
     @field:Schema(description = "소셜 로그인 제공자 타입", example = "GOOGLE", allowableValues = ["GOOGLE", "KAKAO", "NAVER"])
     val providerType: ProviderType,
 
+    @field:Schema(description = "인가 요청 시 사용한 redirect_uri. 허용 목록에 있을 때만 사용.")
+    val redirectUri: String? = null,
 )
 
 fun SocialLoginRequestDto.toDomain(): SocialLoginRequest =
-    SocialLoginRequest(authCode = authCode, codeVerifier = codeVerifier, state = state, providerType = providerType)
+    SocialLoginRequest(authCode = authCode, codeVerifier = codeVerifier, state = state, providerType = providerType, redirectUri = redirectUri)
 

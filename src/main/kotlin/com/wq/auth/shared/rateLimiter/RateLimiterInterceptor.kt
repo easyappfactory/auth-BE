@@ -3,7 +3,7 @@ package com.wq.auth.shared.rateLimiter
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.shared.error.CommonExceptionCode
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.FailResponse
+import com.wq.auth.web.common.response.CommonResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -58,10 +58,9 @@ class RateLimiterInterceptor(
 
             val limitMessage = "최대 ${rateLimit.limit}회 / ${rateLimit.duration}${rateLimit.timeUnit.name.lowercase()} 제한을 초과했습니다."
 
-            val failResponse = FailResponse(
-                success = false,
-                message = limitMessage,
-                error = CommonExceptionCode.RATE_LIMIT_EXCEEDED.toString()
+            val failResponse = CommonResponse.fail(
+                CommonExceptionCode.RATE_LIMIT_EXCEEDED.toString(),
+                limitMessage
             )
 
             response.writer.write(objectMapper.writeValueAsString(failResponse))

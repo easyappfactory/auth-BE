@@ -1,0 +1,25 @@
+# Build output and caches
+build/
+.gradle/
+
+# Git and IDE
+.git/
+.gitignore
+.idea/
+*.iml
+
+# Documentation (not needed in image)
+*.md
+docs/
+
+# Local env and secrets
+.env
+.env.*
+
+# OS and misc
+.DS_Store
+*.log
+*.hprof
+
+# Test and dev
+src/test/
