@@ -60,6 +60,7 @@ jobs:
           export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
           cd ~
+          docker rm -f auth-be || true
           docker-compose pull auth-be
           docker-compose up -d --no-deps auth-be
           docker logout
