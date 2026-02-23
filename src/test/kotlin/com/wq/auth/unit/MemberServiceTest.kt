@@ -50,6 +50,7 @@ class MemberServiceTest : DescribeSpec({
             val result = memberService.getUserInfo(opaqueId)
 
             // then
+            result.userId shouldBe opaqueId
             result.nickname shouldBe nickname
             result.email shouldBe email
 

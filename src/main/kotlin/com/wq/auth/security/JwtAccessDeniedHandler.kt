@@ -2,7 +2,7 @@ package com.wq.auth.security
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.security.jwt.error.JwtExceptionCode
-import com.wq.auth.web.common.response.Responses
+import com.wq.auth.web.common.response.CommonResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,7 +37,7 @@ class JwtAccessDeniedHandler(
         response.characterEncoding = StandardCharsets.UTF_8.name()
 
         // 표준 API 응답 형식으로 에러 응답 생성
-        val errorResponse = Responses.fail(JwtExceptionCode.FORBIDDEN)
+        val errorResponse = CommonResponse.fail(JwtExceptionCode.FORBIDDEN)
         val jsonResponse = objectMapper.writeValueAsString(errorResponse)
 
         response.writer.write(jsonResponse)
