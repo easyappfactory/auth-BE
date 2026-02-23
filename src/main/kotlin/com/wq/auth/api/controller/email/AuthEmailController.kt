@@ -58,10 +58,10 @@ class AuthEmailController(
     @RateLimit(limit = 3, duration = 10, timeUnit = TimeUnit.MINUTES)
     @PublicApi
     @PostMapping("api/v1/auth/email/request")
-    fun requestCode(@RequestBody req: EmailRequestDto): CommonResponse<Nothing?> {
+    fun requestCode(@RequestBody req: EmailRequestDto): CommonResponse<Unit> {
         return try {
             authEmailService.sendVerificationCode(req.email)
-            CommonResponse.success(message = "해당 이메일로 인증코드가 발송되었습니다.", data = null)
+            CommonResponse.success(message = "해당 이메일로 인증코드가 발송되었습니다.")
         } catch (e: EmailException) {
             CommonResponse.fail(e.emailCode)
         }
@@ -87,10 +87,10 @@ class AuthEmailController(
     )
     @RateLimit(limit = 10, duration = 5, timeUnit = TimeUnit.MINUTES)
     @PostMapping("api/v1/auth/email/verify")
-    fun verifyCode(@RequestBody req: EmailVerifyRequestDto): CommonResponse<Nothing?> {
+    fun verifyCode(@RequestBody req: EmailVerifyRequestDto): CommonResponse<Unit> {
         return try {
             authEmailService.verifyCode(req.email, req.verifyCode)
-            CommonResponse.success(message = "인증되었습니다.", data = null)
+            CommonResponse.success(message = "인증되었습니다.")
         } catch (e: EmailException) {
             CommonResponse.fail(e.emailCode)
         }

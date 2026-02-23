@@ -1,8 +1,10 @@
 package com.wq.auth.web.common.response
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.wq.auth.shared.error.ApiResponseCode
 import io.swagger.v3.oas.annotations.media.Schema
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class CommonResponse<T>(
     @get:Schema(description = "요청 성공 여부", example = "true")
     val success: Boolean,
@@ -30,14 +32,14 @@ data class CommonResponse<T>(
             data = data
         )
 
-        fun fail(code: ApiResponseCode): CommonResponse<Nothing> = CommonResponse(
+        fun fail(code: ApiResponseCode): CommonResponse<Unit> = CommonResponse(
             success = false,
             code = code.toString(),
             message = code.message,
             data = null
         )
 
-        fun fail(code: String, message: String): CommonResponse<Nothing> = CommonResponse(
+        fun fail(code: String, message: String): CommonResponse<Unit> = CommonResponse(
             success = false,
             code = code,
             message = message,
