@@ -26,7 +26,8 @@ import org.springframework.web.client.HttpServerErrorException
 @Component
 class NaverOAuthClient(
     private val naverOAuthProperties: NaverOAuthProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val redirectUriResolver: OAuthRedirectUriResolver,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
     private val restTemplate = RestTemplate()
@@ -37,6 +38,7 @@ class NaverOAuthClient(
      * @param authorizationCode Naver로부터 받은 인가 코드
      * @param state CSRF 방지용 상태 값
      * @param codeVerifier PKCE 검증용 코드 검증자
+     * @param requestRedirectUri 요청에 담긴 redirect_uri (있으면 허용 목록 검증 후 사용)
      * @return Naver 액세스 토큰
      * @throws SocialLoginException 토큰 획득 실패 시
      */
@@ -44,9 +46,11 @@ class NaverOAuthClient(
         authorizationCode: String,
         state: String,
         codeVerifier: String,
+        requestRedirectUri: String? = null,
     ): String {
+        val redirectUri = redirectUriResolver.resolve(requestRedirectUri, naverOAuthProperties.redirectUri)
         log.info { "Naver 액세스 토큰 요청 시작" }
-        log.info { "redirectUri: ${ naverOAuthProperties.redirectUri}" }
+        log.info { "redirectUri: $redirectUri" }
 
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_FORM_URLENCODED
@@ -59,7 +63,7 @@ class NaverOAuthClient(
             add("code", authorizationCode)
             add("grant_type", "authorization_code")
             add("state", state)
-            add("redirect_uri", naverOAuthProperties.redirectUri)
+            add("redirect_uri", redirectUri)
         }
 
         val request = HttpEntity(body, headers)
@@ -159,8 +163,7 @@ class NaverOAuthClient(
      */
     override fun getUserFromAuthCode(req: OAuthAuthCodeRequest): OAuthUser {
         log.info { "Naver AuthCode 요청 시작" }
-        log.info { "redirectUri: ${naverOAuthProperties.redirectUri}" }
-        val accessToken = getAccessToken(req.authCode, req.state!!, req.codeVerifier)
+        val accessToken = getAccessToken(req.authCode, req.state!!, req.codeVerifier, req.redirectUri)
         val naverUserInfo = getUserInfo(accessToken)
 
         return OAuthUser(
@@ -186,7 +189,7 @@ class NaverOAuthClient(
         state: String,
         codeVerifier: String,
     ): NaverUserInfoResponse {
-        val accessToken = getAccessToken(authorizationCode, state, codeVerifier)
+        val accessToken = getAccessToken(authorizationCode, state, codeVerifier, null)
         return getUserInfo(accessToken)
     }
 }

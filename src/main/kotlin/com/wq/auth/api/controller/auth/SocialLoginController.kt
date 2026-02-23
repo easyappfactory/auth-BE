@@ -409,6 +409,7 @@ class SocialLoginController(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             providerType = ProviderType.GOOGLE,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
@@ -483,6 +484,7 @@ class SocialLoginController(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             providerType = ProviderType.KAKAO,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
@@ -558,6 +560,7 @@ class SocialLoginController(
             codeVerifier = request.codeVerifier,
             state = request.state,
             providerType = ProviderType.NAVER,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())

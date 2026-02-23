@@ -1,4 +1,4 @@
-# GrowGrammers Auth-BE
+# Auth-BE
 
 Spring Boot 기반의 인증/소셜 로그인 및 계정 연동(링크) 백엔드입니다.
 
@@ -130,15 +130,30 @@ MAIL_PASSWORD=your-app-password
 | POST | `/api/v1/auth/link/kakao` | Kakao 계정 연동 | **필요** |
 | POST | `/api/v1/auth/link/naver` | Naver 계정 연동 | **필요** |
 
+**요청 바디 필드 (Provider별)**  
+- **Google/Kakao**: `authCode`, `codeVerifier` (필수). `redirectUri`는 서버 환경변수 사용.
+- **Naver**: `authCode`, `state`, `codeVerifier` (세 필수 모두 필요). 인가 요청 시 사용한 `state`와 동일한 값 전달.
+
 **요청 예시** (Google 로그인):
 ```json
 POST /api/v1/auth/google/login
 Content-Type: application/json
 
 {
-  "code": "4/0AfJohXmx...",
-  "codeVerifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
-  "redirectUri": "http://localhost:5173/auth/google/callback"
+  "authCode": "4/0AfJohXmx...",
+  "codeVerifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+}
+```
+
+**요청 예시** (Naver 로그인):
+```json
+POST /api/v1/auth/naver/login
+Content-Type: application/json
+
+{
+  "authCode": "네이버에서_받은_인가코드",
+  "state": "인가_요청시_사용한_state_값과_동일",
+  "codeVerifier": "PKCE_코드_검증자"
 }
 ```
 

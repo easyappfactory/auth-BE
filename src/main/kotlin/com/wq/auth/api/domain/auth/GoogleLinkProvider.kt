@@ -26,6 +26,7 @@ class GoogleLinkProvider(
         val authCodeRequest = OAuthAuthCodeRequest(
             authCode = linkRequest.authCode,
             codeVerifier = linkRequest.codeVerifier,
+            redirectUri = linkRequest.redirectUri,
         )
         return googleOAuthClient.getUserFromAuthCode(authCodeRequest)
 
