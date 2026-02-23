@@ -1,1 +1,1 @@
-rootProject.name = "auth-backend"
+rootProject.name = "auth-be"

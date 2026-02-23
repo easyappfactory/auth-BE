@@ -57,12 +57,12 @@ java -jar build/libs/auth-be-0.0.1-SNAPSHOT.jar
 배포는 **Docker** 방식으로 수행하며, systemd/JAR 직접 실행은 사용하지 않습니다.
 
 - **main** 브랜치 push 시 GitHub Actions가 Docker 이미지를 빌드·푸시한 뒤 EC2에 SSH로 접속해 컨테이너를 갱신합니다.
-- EC2에서는 env를 **단일 파일**로만 사용합니다. GitHub Secret **`ENV_FILE`**(전체 .env 내용)을 CI가 **`/env/auth-backend.env`** 에 복사하고, 컨테이너는 `--env-file /env/auth-backend.env` 로 실행합니다. (다른 도커 서비스와 구분을 위해 패키지명.env 형식 사용.)
+- EC2에서는 env를 **단일 파일**로만 사용합니다. GitHub Secret **`ENV_FILE`**(전체 .env 내용)을 CI가 **`/env/auth-be.env`** 에 복사하고, 컨테이너는 `--env-file /env/auth-be.env` 로 실행합니다. (다른 도커 서비스와 구분을 위해 패키지명.env 형식 사용.)
 
 실행 예:
 
 ```bash
-docker run -d --restart unless-stopped --name auth-be -p 9000:9000 --env-file /env/auth-backend.env <DOCKERHUB_USERNAME>/auth-server:latest
+docker run -d --restart unless-stopped --name auth-be -p 9000:9000 --env-file /env/auth-be.env <DOCKERHUB_USERNAME>/auth-server:latest
 ```
 
 ## 환경 변수 설정

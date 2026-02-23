@@ -41,7 +41,7 @@ jobs:
         env:
           ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          echo "$ENV_FILE_CONTENT" > auth-backend.env
+          echo "$ENV_FILE_CONTENT" > auth-be.env
 
       - name: Ensure /env on EC2
         run: |
@@ -50,7 +50,7 @@ jobs:
 
       - name: Copy env file to EC2
         run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-backend.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/env/auth-backend.env
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-be.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/env/auth-be.env
 
       - name: Deploy container on EC2
         env:
@@ -62,5 +62,5 @@ jobs:
             docker stop auth-be 2>/dev/null || true && \
             docker rm auth-be 2>/dev/null || true && \
             docker pull $DOCKERHUB_USERNAME/auth-server:latest && \
-            docker run -d --restart unless-stopped --name auth-be -p 9000:9000 --env-file /env/auth-backend.env $DOCKERHUB_USERNAME/auth-server:latest \
+            docker run -d --restart unless-stopped --name auth-be -p 9000:9000 --env-file /env/auth-be.env $DOCKERHUB_USERNAME/auth-server:latest \
           "
