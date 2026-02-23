@@ -52,10 +52,6 @@ jobs:
         run: |
           scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-be.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/env/auth-be.env
 
-      - name: Copy docker-compose to EC2
-        run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem docker-compose.yml ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/
-
       - name: Deploy auth-be only (EC2)
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
@@ -65,6 +61,6 @@ jobs:
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
           cd ~
           docker compose pull auth-be
-          docker compose up -d auth-be
+          docker compose up -d --no-deps auth-be
           docker logout
           '
