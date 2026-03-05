@@ -62,7 +62,7 @@ class SecurityConfig(
                         "/actuator/health",       // 헬스체크
                         "/swagger-ui/**",         // Swagger UI
                         "/v3/api-docs/**",        // OpenAPI 문서
-                        "/api/v1/auth/introspect"
+                        "/h2-console/**"          // H2 콘솔 (개발용)
                     ).permitAll()
                     
                     // 나머지 모든 요청은 인증 필요 (세부 권한은 @PreAuthorize로 처리)
