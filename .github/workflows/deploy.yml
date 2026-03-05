@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - dev
+      - feat/internal-server-api
 
 jobs:
   build-and-push:
