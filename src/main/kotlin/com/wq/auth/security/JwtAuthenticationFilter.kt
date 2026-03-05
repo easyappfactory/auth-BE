@@ -22,6 +22,31 @@ class JwtAuthenticationFilter(
     companion object {
         private const val AUTHORIZATION_HEADER = "Authorization"
         private const val BEARER_PREFIX = "Bearer "
+
+        /**
+         * HTTP 요청에서 JWT 토큰을 추출합니다.
+         *
+         * 토큰 우선순위:
+         * 1. `accessToken` HttpOnly 쿠키 (웹 클라이언트 전용)
+         *    - 쿠키가 존재하면 헤더는 완전히 무시됩니다.
+         * 2. `Authorization: Bearer <token>` 헤더 (앱 클라이언트 / 쿠키 없을 때만 사용)
+         *
+         * @return 토큰 문자열, 아무것도 없으면 null
+         */
+        fun extractToken(request: HttpServletRequest): String? {
+            val accessTokenCookie = request.cookies?.firstOrNull { it.name == "accessToken" }
+
+            if (accessTokenCookie != null) {
+                return accessTokenCookie.value
+            }
+
+            val authorizationHeader = request.getHeader(AUTHORIZATION_HEADER)
+            return if (!authorizationHeader.isNullOrBlank() && authorizationHeader.startsWith(BEARER_PREFIX)) {
+                authorizationHeader.substring(BEARER_PREFIX.length)
+            } else {
+                null
+            }
+        }
     }
 
     override fun doFilterInternal(
@@ -29,27 +54,18 @@ class JwtAuthenticationFilter(
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
-
-        val httpReq = request as HttpServletRequest
-        println("Request URI: ${httpReq.requestURI}")
-
         try {
-            // Authorization 헤더에서 JWT 토큰 추출
-            val token = extractTokenFromRequest(request)
-
-            if (token != null) {
-                // JWT 토큰 유효성 검증
+            val token = extractToken(request)
+            if (!token.isNullOrBlank()) {
                 jwtProvider.validateOrThrow(token)
 
-                // 토큰에서 사용자 정보 추출
-                val principalDetails = extractPrincipalDetails(token)
+                val principalDetails = PrincipalDetails(jwtProvider.getOpaqueId(token))
 
-                // Spring Security 인증 객체 생성 및 설정
                 // todo : TokenService로 분리 필요.
                 val authentication = UsernamePasswordAuthenticationToken(
-                    principalDetails,       // principal: PrincipalDetails 객체
-                    null,                  // credentials: 비밀번호 (JWT에서는 불필요)
-                    principalDetails.authorities  // authorities: 사용자 권한
+                    principalDetails,
+                    null,
+                    principalDetails.authorities
                 )
                 SecurityContextHolder.getContext().authentication = authentication
             }
@@ -59,45 +75,6 @@ class JwtAuthenticationFilter(
             log.debug(e) { "JWT 필터 처리 중 예외 발생: ${e.message}" }
         }
 
-        // 다음 필터로 진행
         filterChain.doFilter(request, response)
-    }
-
-    /**
-     * HTTP 요청에서 JWT 토큰을 추출합니다.
-     *
-     * @param request HTTP 요청 객체
-     * @return 추출된 JWT 토큰 문자열, 없으면 null
-     */
-    private fun extractTokenFromRequest(request: HttpServletRequest): String? {
-        // 1. accessToken HttpOnly 쿠키 우선 사용 (웹 클라이언트)
-        val cookieToken = request.cookies
-            ?.firstOrNull { it.name == "accessToken" }
-            ?.value
-
-        if (!cookieToken.isNullOrBlank()) {
-            return cookieToken
-        }
-
-        // 2. Authorization 헤더(Bearer) fallback (앱 및 과도기 웹 클라이언트)
-        val authorizationHeader = request.getHeader(AUTHORIZATION_HEADER)
-
-        return if (!authorizationHeader.isNullOrBlank() && authorizationHeader.startsWith(BEARER_PREFIX)) {
-            authorizationHeader.substring(BEARER_PREFIX.length)
-        } else {
-            null
-        }
-    }
-
-    /**
-     * JWT 토큰에서 PrincipalDetails 객체를 생성합니다.
-     *
-     * @param token JWT 토큰
-     * @return PrincipalDetails 객체
-     */
-    private fun extractPrincipalDetails(token: String): PrincipalDetails {
-        val opaqueId = jwtProvider.getOpaqueId(token)
-
-        return PrincipalDetails(opaqueId)
     }
 }

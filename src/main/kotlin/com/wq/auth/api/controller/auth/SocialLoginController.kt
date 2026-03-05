@@ -42,7 +42,7 @@ class SocialLoginController(
 ) {
 
     /**
-     * 범용 소셜 로그인 처리
+     * 소셜 로그인 처리
      *
      * 프론트엔드에서 소셜 제공자로부터 받은 인가 코드를 사용하여
      * 사용자 정보를 조회하고 JWT 토큰을 발급합니다.
@@ -61,8 +61,8 @@ class SocialLoginController(
             - 프론트엔드 환경별로 다른 URI 사용 가능 (개발/스테이징/프로덕션)
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
             
             **지원 소셜 제공자:**
             - GOOGLE: Google OAuth2
@@ -74,7 +74,7 @@ class SocialLoginController(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
+                description = "로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
                 content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
@@ -132,8 +132,9 @@ class SocialLoginController(
             - 프론트엔드 환경별로 다른 URI 사용 가능
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
+            - 기존 Authorization 헤더 방식은 보안 및 웹 친화적 설계를 위해 제거되었습니다.
             
             **쿠키 설정:**
             - HttpOnly: JavaScript 접근 불가 (XSS 방지)
@@ -145,7 +146,7 @@ class SocialLoginController(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "Google 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
+                description = "Google 로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
                 content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
@@ -208,15 +209,16 @@ class SocialLoginController(
             - 보안 강화를 위해 사용 권장
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
+            - 기존 Authorization 헤더 방식은 보안 및 웹 친화적 설계를 위해 제거되었습니다.
         """
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "카카오 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
+                description = "카카오 로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
                 content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
@@ -276,8 +278,9 @@ class SocialLoginController(
             - 프론트엔드 환경별로 다른 URI 사용 가능
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
+            - 기존 Authorization 헤더 방식은 보안 및 웹 친화적 설계를 위해 제거되었습니다.
             
             **쿠키 설정:**
             - HttpOnly: JavaScript 접근 불가 (XSS 방지)
@@ -289,7 +292,7 @@ class SocialLoginController(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "Naver 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
+                description = "Naver 로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
                 content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
@@ -347,7 +350,7 @@ class SocialLoginController(
             - 연동 계정이 있는 경우: 두 계정 자동 병합 (기존 회원 정보 유지)
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -422,7 +425,7 @@ class SocialLoginController(
             - 보안 강화를 위해 사용 권장
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -497,7 +500,7 @@ class SocialLoginController(
             - 프론트엔드에서 생성한 state 값을 전달해야 함
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -546,7 +549,7 @@ class SocialLoginController(
     }
 
     /**
-     * AccessToken/RefreshToken을 HttpOnly 쿠키 및 Authorization 헤더로 설정합니다.
+     * AccessToken/RefreshToken을 HttpOnly 쿠키로 설정합니다.
      *
      * @param response HTTP 응답 객체
      * @param accessToken 액세스 토큰
@@ -562,6 +565,5 @@ class SocialLoginController(
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
     }
 }
