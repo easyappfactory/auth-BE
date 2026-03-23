@@ -28,9 +28,9 @@ class NaverOAuthClient(
     private val naverOAuthProperties: NaverOAuthProperties,
     private val objectMapper: ObjectMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
+    private val restTemplate: RestTemplate,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
-    private val restTemplate = RestTemplate()
 
     /**
      * 인가 코드를 사용하여 액세스 토큰을 획득합니다.
