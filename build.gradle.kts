@@ -39,7 +39,7 @@ extra["spring-security.version"] = "6.5.3"
 	implementation("org.springframework.boot:spring-boot-starter-logging")
 	implementation("io.github.oshai:kotlin-logging-jvm:5.1.4")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.0")
-	implementation("mysql:mysql-connector-java:8.0.33")
+	runtimeOnly("org.postgresql:postgresql")
 
 	// oauth
 	implementation("com.google.api-client:google-api-client:2.7.0")
@@ -74,6 +74,9 @@ extra["spring-security.version"] = "6.5.3"
 
 	//rate limiter - token bucket
 	implementation("com.bucket4j:bucket4j-core:8.7.0")
+
+	// http client (for connection pooling)
+	implementation("org.apache.httpcomponents.client5:httpclient5:5.3.1")
 
 	// UUID v7 생성 (time-ordered UUID)
 	implementation("com.github.f4b6a3:uuid-creator:6.0.0")
