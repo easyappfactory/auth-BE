@@ -1,3 +1,4 @@
+# local — 로컬 개발 (DDL update, SQL 디버그, 쿠키 완화)
 spring:
   config:
     activate:

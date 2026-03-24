@@ -1,3 +1,4 @@
+# prod — 운영 (RDS SSL, DDL validate, 쿠키 Strict)
 spring:
   config:
     activate:

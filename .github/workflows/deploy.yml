@@ -10,30 +10,18 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'alpha' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set Environment Variables
+      - name: Set image tag and Spring profile
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "ENV_TYPE=PROD" >> $GITHUB_ENV
-            echo "DOCKERHUB_USERNAME=${{ secrets.PROD_DOCKERHUB_USERNAME }}" >> $GITHUB_ENV
-            echo "DOCKERHUB_TOKEN=${{ secrets.PROD_DOCKERHUB_TOKEN }}" >> $GITHUB_ENV
-            echo "EC2_KEY=${{ secrets.PROD_EC2_KEY }}" >> $GITHUB_ENV
-            echo "EC2_HOST=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_ENV
-            echo "EC2_USER=${{ secrets.PROD_EC2_USER }}" >> $GITHUB_ENV
-            echo "ENV_FILE_CONTENT=${{ secrets.PROD_AUTH_BE_ENV_FILE }}" >> $GITHUB_ENV
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
             echo "SPRING_PROFILE=prod" >> $GITHUB_ENV
           else
-            echo "ENV_TYPE=ALPHA" >> $GITHUB_ENV
-            echo "DOCKERHUB_USERNAME=${{ secrets.ALPHA_DOCKERHUB_USERNAME }}" >> $GITHUB_ENV
-            echo "DOCKERHUB_TOKEN=${{ secrets.ALPHA_DOCKERHUB_TOKEN }}" >> $GITHUB_ENV
-            echo "EC2_KEY=${{ secrets.ALPHA_EC2_KEY }}" >> $GITHUB_ENV
-            echo "EC2_HOST=${{ secrets.ALPHA_EC2_HOST }}" >> $GITHUB_ENV
-            echo "EC2_USER=${{ secrets.ALPHA_EC2_USER }}" >> $GITHUB_ENV
-            echo "ENV_FILE_CONTENT=${{ secrets.ALPHA_AUTH_BE_ENV_FILE }}" >> $GITHUB_ENV
             echo "IMAGE_TAG=alpha" >> $GITHUB_ENV
             echo "SPRING_PROFILE=alpha" >> $GITHUB_ENV
           fi
@@ -41,8 +29,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -50,38 +38,52 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
-            ${{ env.DOCKERHUB_USERNAME }}/auth-server:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/auth-server:${{ github.sha }}
 
       - name: Setup SSH
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ env.EC2_KEY }}" | base64 --decode > ~/.ssh/ec2_key.pem
+          printf '%s' "${{ secrets.EC2_KEY }}" > /tmp/ec2_key_src
+          if [[ ! -s /tmp/ec2_key_src ]]; then
+            echo "::error::EC2_KEY secret is empty" >&2
+            exit 1
+          fi
+          if head -n 1 /tmp/ec2_key_src | grep -q '^[[:space:]]*-----BEGIN'; then
+            cp /tmp/ec2_key_src ~/.ssh/ec2_key.pem
+          else
+            tr -d '\n\r \t' < /tmp/ec2_key_src | base64 --decode > ~/.ssh/ec2_key.pem || {
+              echo "::error::EC2_KEY is not PEM and base64 decode failed" >&2
+              exit 1
+            }
+          fi
+          rm -f /tmp/ec2_key_src
           chmod 600 ~/.ssh/ec2_key.pem
 
-      - name: Create env dir and Copy env file to EC2
+      - name: Create env file and copy to EC2
         run: |
-          echo "${{ env.ENV_FILE_CONTENT }}" > auth-be.env
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} 'mkdir -p ~/env'
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-be.env ${{ env.EC2_USER }}@${{ env.EC2_HOST }}:~/env/auth-be.env
+          printf '%s\n' "${{ secrets.AUTH_BE_ENV_FILE }}" > auth-be.env
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/env'
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-be.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/env/auth-be.env
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
           set -e
-          echo '${{ env.DOCKERHUB_TOKEN }}' | docker login -u '${{ env.DOCKERHUB_USERNAME }}' --password-stdin
-          
-          docker pull ${{ env.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
-          
+          echo '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
+
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
+
           docker rm -f auth-be || true
-          
+
           docker run -d \
             --name auth-be \
             --restart unless-stopped \
             --network app-network \
             --env-file ~/env/auth-be.env \
             -e SPRING_PROFILES_ACTIVE=${{ env.SPRING_PROFILE }} \
-            ${{ env.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
-            
+            ${{ secrets.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
+
           docker logout
           "
