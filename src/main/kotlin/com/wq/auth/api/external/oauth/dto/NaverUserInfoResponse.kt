@@ -32,7 +32,7 @@ data class NaverUserInfo(
     val email: String? = null,
 
     @field:JsonProperty("verified_email")
-    val verifiedEmail: Boolean,
+    val verifiedEmail: Boolean? = false,
 
     @field:JsonProperty("gender")
     val gender: String? = null,

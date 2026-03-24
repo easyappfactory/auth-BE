@@ -15,7 +15,7 @@ data class GoogleUserInfoResponse(
     val email: String,
 
     @field:JsonProperty("verified_email")
-    val verifiedEmail: Boolean,
+    val verifiedEmail: Boolean? = true,
 
     @field:JsonProperty("name")
     val name: String,
