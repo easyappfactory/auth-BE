@@ -13,16 +13,14 @@ import org.springframework.http.*
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
-import org.springframework.web.client.RestTemplate
-import org.springframework.web.client.HttpClientErrorException
-import org.springframework.web.client.HttpServerErrorException
+import org.springframework.web.client.RestClient
 
 @Component
 class KakaoOAuthClient(
     private val kakaoOAuthProperties: KakaoOAuthProperties,
     private val objectMapper: ObjectMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
-    private val restTemplate: RestTemplate,
+    private val restClient: RestClient,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
 
@@ -33,10 +31,6 @@ class KakaoOAuthClient(
     ): Map<String, String> {
         val redirectUri = redirectUriResolver.resolve(requestRedirectUri, kakaoOAuthProperties.redirectUri)
         log.info { "카카오 토큰 요청 시작" }
-
-        val headers = HttpHeaders().apply {
-            contentType = MediaType.APPLICATION_FORM_URLENCODED
-        }
 
         val body: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "authorization_code")
@@ -51,14 +45,13 @@ class KakaoOAuthClient(
             }
         }
 
-        val request = HttpEntity(body, headers)
-        
         try {
-            val response = restTemplate.postForEntity(
-                kakaoOAuthProperties.tokenUri,
-                request,
-                String::class.java
-            )
+            val response = restClient.post()
+                .uri(kakaoOAuthProperties.tokenUri)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
+                .retrieve()
+                .toEntity(String::class.java)
             
             if (response.statusCode == HttpStatus.OK && response.body != null) {
                 val tokenResponse = objectMapper.readTree(response.body!!)
@@ -123,20 +116,13 @@ class KakaoOAuthClient(
     }
 
     fun getUserInfo(accessToken: String): KakaoUserInfoResponse {
-        val headers = HttpHeaders().apply {
-            set("Authorization", "Bearer $accessToken")
-            contentType = MediaType.APPLICATION_JSON
-        }
-
-        val request = HttpEntity<String>(headers)
-
         try {
-            val response = restTemplate.exchange(
-                kakaoOAuthProperties.userInfoUri,
-                HttpMethod.GET,
-                request,
-                String::class.java
-            )
+            val response = restClient.get()
+                .uri(kakaoOAuthProperties.userInfoUri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
                 return objectMapper.readValue(response.body!!, KakaoUserInfoResponse::class.java)

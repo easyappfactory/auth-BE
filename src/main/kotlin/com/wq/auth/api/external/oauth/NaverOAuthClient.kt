@@ -13,9 +13,9 @@ import org.springframework.http.*
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
-import org.springframework.web.client.RestTemplate
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
+import org.springframework.web.client.RestClient
 
 /**
  * Naver OAuth2 클라이언트
@@ -28,7 +28,7 @@ class NaverOAuthClient(
     private val naverOAuthProperties: NaverOAuthProperties,
     private val objectMapper: ObjectMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
-    private val restTemplate: RestTemplate,
+    private val restClient: RestClient,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
 
@@ -52,10 +52,6 @@ class NaverOAuthClient(
         log.info { "Naver 액세스 토큰 요청 시작" }
         log.info { "redirectUri: $redirectUri" }
 
-        val headers = HttpHeaders().apply {
-            contentType = MediaType.APPLICATION_FORM_URLENCODED
-        }
-
         val body: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
             add("client_id", naverOAuthProperties.clientId)
             add("client_secret", naverOAuthProperties.clientSecret)
@@ -66,14 +62,13 @@ class NaverOAuthClient(
             add("redirect_uri", redirectUri)
         }
 
-        val request = HttpEntity(body, headers)
-
         try {
-            val response = restTemplate.postForEntity(
-                naverOAuthProperties.tokenUri,
-                request,
-                String::class.java
-            )
+            val response = restClient.post()
+                .uri(naverOAuthProperties.tokenUri)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
+                .retrieve()
+                .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
                 val tokenResponse = objectMapper.readTree(response.body!!)
@@ -115,20 +110,13 @@ class NaverOAuthClient(
     fun getUserInfo(accessToken: String): NaverUserInfoResponse {
         log.info { "Naver 사용자 정보 조회 시작" }
 
-        val headers = HttpHeaders().apply {
-            set("Authorization", "Bearer $accessToken")
-            contentType = MediaType.APPLICATION_JSON
-        }
-
-        val request = HttpEntity<String>(headers)
-
         try {
-            val response = restTemplate.exchange(
-                naverOAuthProperties.userInfoUri,
-                HttpMethod.GET,
-                request,
-                String::class.java
-            )
+            val response = restClient.get()
+                .uri(naverOAuthProperties.userInfoUri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
                 val userInfo = objectMapper.readValue(response.body!!, NaverUserInfoResponse::class.java)

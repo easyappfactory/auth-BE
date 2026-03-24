@@ -13,16 +13,14 @@ import org.springframework.http.*
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
-import org.springframework.web.client.RestTemplate
-import org.springframework.web.client.HttpClientErrorException
-import org.springframework.web.client.HttpServerErrorException
+import org.springframework.web.client.RestClient
 
 @Component
 class GoogleOAuthClient(
     private val googleOAuthProperties: GoogleOAuthProperties,
     private val objectMapper: ObjectMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
-    private val restTemplate: RestTemplate,
+    private val restClient: RestClient,
 ) : OAuthClient {
     private val log = KotlinLogging.logger {}
 
@@ -34,10 +32,6 @@ class GoogleOAuthClient(
         val redirectUri = redirectUriResolver.resolve(requestRedirectUri, googleOAuthProperties.redirectUri)
         log.info { "Google 토큰 요청 시작" }
 
-        val headers = HttpHeaders().apply {
-            contentType = MediaType.APPLICATION_FORM_URLENCODED
-        }
-
         val body: MultiValueMap<String, String> = LinkedMultiValueMap<String, String>().apply {
             add("client_id", googleOAuthProperties.clientId)
             add("client_secret", googleOAuthProperties.clientSecret)
@@ -47,14 +41,13 @@ class GoogleOAuthClient(
             add("redirect_uri", redirectUri)
         }
         
-        val request = HttpEntity(body, headers)
-        
         try {
-            val response = restTemplate.postForEntity(
-                googleOAuthProperties.tokenUri,
-                request,
-                String::class.java
-            )
+            val response = restClient.post()
+                .uri(googleOAuthProperties.tokenUri)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
+                .retrieve()
+                .toEntity(String::class.java)
             
             if (response.statusCode == HttpStatus.OK && response.body != null) {
                 val tokenResponse = objectMapper.readTree(response.body!!)
@@ -119,20 +112,13 @@ class GoogleOAuthClient(
     }
 
     fun getUserInfo(accessToken: String): GoogleUserInfoResponse {
-        val headers = HttpHeaders().apply {
-            set("Authorization", "Bearer $accessToken")
-            contentType = MediaType.APPLICATION_JSON
-        }
-
-        val request = HttpEntity<String>(headers)
-
         try {
-            val response = restTemplate.exchange(
-                googleOAuthProperties.userInfoUri,
-                HttpMethod.GET,
-                request,
-                String::class.java
-            )
+            val response = restClient.get()
+                .uri(googleOAuthProperties.userInfoUri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
                 return objectMapper.readValue(response.body!!, GoogleUserInfoResponse::class.java)
