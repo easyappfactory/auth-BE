@@ -27,7 +27,7 @@ jobs:
       - name: Set image tag and Spring profile
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+            echo "IMAGE_TAG=prod" >> $GITHUB_ENV
             echo "SPRING_PROFILE=prod" >> $GITHUB_ENV
           else
             echo "IMAGE_TAG=alpha" >> $GITHUB_ENV
