@@ -1,6 +1,5 @@
 package com.wq.auth.api.external.oauth
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.external.oauth.dto.GoogleUserInfoResponse
 import com.wq.auth.api.domain.auth.request.OAuthAuthCodeRequest
@@ -14,11 +13,12 @@ import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.json.JsonMapper
 
 @Component
 class GoogleOAuthClient(
     private val googleOAuthProperties: GoogleOAuthProperties,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
     private val restClient: RestClient,
 ) : OAuthClient {
@@ -50,9 +50,9 @@ class GoogleOAuthClient(
                 .toEntity(String::class.java)
             
             if (response.statusCode == HttpStatus.OK && response.body != null) {
-                val tokenResponse = objectMapper.readTree(response.body!!)
-                val accessToken = tokenResponse.get("access_token")?.asText()
-                val idToken = tokenResponse.get("id_token")?.asText()
+                val tokenResponse = jsonMapper.readTree(response.body!!)
+                val accessToken = tokenResponse.get("access_token")?.asString()
+                val idToken = tokenResponse.get("id_token")?.asString()
                 
                 if (accessToken != null) {
                     log.info { "Google 토큰 획득 성공" }
@@ -83,14 +83,14 @@ class GoogleOAuthClient(
                 val chunks = idToken.split(".")
                 if (chunks.size >= 2) {
                     val payload = String(java.util.Base64.getUrlDecoder().decode(chunks[1]))
-                    val jsonNode = objectMapper.readTree(payload)
+                    val jsonNode = jsonMapper.readTree(payload)
                     
                     return OAuthUser(
-                        providerId = jsonNode.get("sub").asText(),
-                        email = jsonNode.get("email")?.asText() ?: "",
+                        providerId = jsonNode.get("sub").asString(),
+                        email = jsonNode.get("email")?.asString() ?: "",
                         verifiedEmail = jsonNode.get("email_verified")?.asBoolean() ?: true,
-                        name = jsonNode.get("name")?.asText() ?: "구글사용자",
-                        givenName = jsonNode.get("given_name")?.asText(),
+                        name = jsonNode.get("name")?.asString() ?: "구글사용자",
+                        givenName = jsonNode.get("given_name")?.asString(),
                         providerType = ProviderType.GOOGLE
                     )
                 }
@@ -121,7 +121,7 @@ class GoogleOAuthClient(
                 .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
-                return objectMapper.readValue(response.body!!, GoogleUserInfoResponse::class.java)
+                return jsonMapper.readValue(response.body!!, GoogleUserInfoResponse::class.java)
             } else {
                 throw SocialLoginException(SocialLoginExceptionCode.GOOGLE_USER_INFO_REQUEST_FAILED)
             }

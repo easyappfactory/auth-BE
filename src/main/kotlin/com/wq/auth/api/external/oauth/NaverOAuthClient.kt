@@ -1,6 +1,5 @@
 package com.wq.auth.api.external.oauth
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.external.oauth.dto.NaverUserInfoResponse
 import com.wq.auth.api.domain.auth.request.OAuthAuthCodeRequest
@@ -16,6 +15,7 @@ import org.springframework.util.MultiValueMap
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.json.JsonMapper
 
 /**
  * Naver OAuth2 클라이언트
@@ -26,7 +26,7 @@ import org.springframework.web.client.RestClient
 @Component
 class NaverOAuthClient(
     private val naverOAuthProperties: NaverOAuthProperties,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
     private val restClient: RestClient,
 ) : OAuthClient {
@@ -71,8 +71,8 @@ class NaverOAuthClient(
                 .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
-                val tokenResponse = objectMapper.readTree(response.body!!)
-                val accessToken = tokenResponse.get("access_token")?.asText()
+                val tokenResponse = jsonMapper.readTree(response.body!!)
+                val accessToken = tokenResponse.get("access_token")?.asString()
 
                 if (accessToken != null) {
                     log.info { "Naver 액세스 토큰 획득 성공" }
@@ -119,7 +119,7 @@ class NaverOAuthClient(
                 .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
-                val userInfo = objectMapper.readValue(response.body!!, NaverUserInfoResponse::class.java)
+                val userInfo = jsonMapper.readValue(response.body!!, NaverUserInfoResponse::class.java)
                 log.info { "Naver 사용자 정보 조회 성공: ${userInfo.response.email ?: "이메일 없음"}" }
                 return userInfo
             } else {

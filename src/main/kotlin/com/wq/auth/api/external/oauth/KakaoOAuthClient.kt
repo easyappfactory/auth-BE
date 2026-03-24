@@ -1,6 +1,5 @@
 package com.wq.auth.api.external.oauth
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.external.oauth.dto.KakaoUserInfoResponse
 import com.wq.auth.api.domain.auth.request.OAuthAuthCodeRequest
@@ -14,11 +13,12 @@ import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.json.JsonMapper
 
 @Component
 class KakaoOAuthClient(
     private val kakaoOAuthProperties: KakaoOAuthProperties,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val redirectUriResolver: OAuthRedirectUriResolver,
     private val restClient: RestClient,
 ) : OAuthClient {
@@ -54,9 +54,9 @@ class KakaoOAuthClient(
                 .toEntity(String::class.java)
             
             if (response.statusCode == HttpStatus.OK && response.body != null) {
-                val tokenResponse = objectMapper.readTree(response.body!!)
-                val accessToken = tokenResponse.get("access_token")?.asText()
-                val idToken = tokenResponse.get("id_token")?.asText()
+                val tokenResponse = jsonMapper.readTree(response.body!!)
+                val accessToken = tokenResponse.get("access_token")?.asString()
+                val idToken = tokenResponse.get("id_token")?.asString()
                 
                 if (accessToken != null) {
                     log.info { "카카오 토큰 획득 성공" }
@@ -87,14 +87,14 @@ class KakaoOAuthClient(
                 val chunks = idToken.split(".")
                 if (chunks.size >= 2) {
                     val payload = String(java.util.Base64.getUrlDecoder().decode(chunks[1]))
-                    val jsonNode = objectMapper.readTree(payload)
+                    val jsonNode = jsonMapper.readTree(payload)
                     
                     return OAuthUser(
-                        providerId = jsonNode.get("sub").asText(),
-                        email = jsonNode.get("email")?.asText() ?: "",
+                        providerId = jsonNode.get("sub").asString(),
+                        email = jsonNode.get("email")?.asString() ?: "",
                         verifiedEmail = jsonNode.get("email_needs_agreement")?.asBoolean()?.not() ?: true,
-                        name = jsonNode.get("nickname")?.asText() ?: "카카오사용자",
-                        givenName = jsonNode.get("nickname")?.asText(),
+                        name = jsonNode.get("nickname")?.asString() ?: "카카오사용자",
+                        givenName = jsonNode.get("nickname")?.asString(),
                         providerType = ProviderType.KAKAO
                     )
                 }
@@ -125,7 +125,7 @@ class KakaoOAuthClient(
                 .toEntity(String::class.java)
 
             if (response.statusCode == HttpStatus.OK && response.body != null) {
-                return objectMapper.readValue(response.body!!, KakaoUserInfoResponse::class.java)
+                return jsonMapper.readValue(response.body!!, KakaoUserInfoResponse::class.java)
             } else {
                 throw SocialLoginException(SocialLoginExceptionCode.KAKAO_USER_INFO_REQUEST_FAILED)
             }
