@@ -4,7 +4,7 @@ name: Deploy (auth-BE)
 # EC2 원격 경로 (아래 deploy job 의 env.PROJECT_ROOT 만 수정)
 #   PROJECT_ROOT … 배포 기준 루트. 예: ~, ~/myapp (끝 슬래시 없음)
 #   환경변수 파일은 항상 {PROJECT_ROOT}/env/ 아래 (이름 고정: env)
-#   배포는 EC2의 PROJECT_ROOT 에서 docker-compose (서비스명: auth-be, compose.yml 과 일치해야 함)
+#   배포는 EC2의 PROJECT_ROOT 에서 docker compose (서비스명: auth-be, V2 기준)
 # ---------------------------------------------------------------------------
 
 on:
@@ -85,8 +85,9 @@ jobs:
           export SPRING_PROFILES_ACTIVE="${{ env.SPRING_PROFILE }}"
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
           cd ${{ env.PROJECT_ROOT }}
-          docker rm -f auth-be || true
+          docker compose stop auth-be || true
+          docker compose rm -f auth-be || true
           docker compose pull auth-be
-          docker compose up -d --no-deps auth-be
+          docker compose up -d --no-deps --force-recreate auth-be
           docker logout
           '
