@@ -16,11 +16,13 @@ spring:
     properties:
       hibernate:
         format_sql: false
+        use_sql_comments: false
 
 logging:
   level:
-    org.hibernate.SQL: error
-    org.springframework.orm.jpa: info
+    org.hibernate.SQL: ERROR
+    org.hibernate.type.descriptor.sql: ERROR
+    org.springframework.orm.jpa: WARN
 
 app:
   cookie:
