@@ -1,9 +1,8 @@
 package com.wq.auth.shared.rateLimiter
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.shared.error.CommonExceptionCode
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.FailResponse
+import com.wq.auth.web.common.response.CommonResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -12,13 +11,14 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.method.HandlerMethod
 import org.springframework.web.servlet.HandlerInterceptor
+import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 @Component
 class RateLimiterInterceptor(
     private val rateLimiter: TokenBucketRateLimiter,
-    private val objectMapper: ObjectMapper
+    private val jsonMapper: JsonMapper
 ) : HandlerInterceptor {
 
     private val log = KotlinLogging.logger {}
@@ -58,13 +58,12 @@ class RateLimiterInterceptor(
 
             val limitMessage = "최대 ${rateLimit.limit}회 / ${rateLimit.duration}${rateLimit.timeUnit.name.lowercase()} 제한을 초과했습니다."
 
-            val failResponse = FailResponse(
-                success = false,
-                message = limitMessage,
-                error = CommonExceptionCode.RATE_LIMIT_EXCEEDED.toString()
+            val failResponse = CommonResponse.fail(
+                CommonExceptionCode.RATE_LIMIT_EXCEEDED.toString(),
+                limitMessage
             )
 
-            response.writer.write(objectMapper.writeValueAsString(failResponse))
+            response.writer.write(jsonMapper.writeValueAsString(failResponse))
 
             log.info{"Rate limit exceeded: userOpaqueId=$userOpaqueId, endpoint=${request.requestURI}"}
             false

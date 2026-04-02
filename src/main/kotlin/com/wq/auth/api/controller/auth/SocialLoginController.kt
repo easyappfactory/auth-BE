@@ -7,10 +7,9 @@ import com.wq.auth.api.domain.auth.SocialLoginService
 import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.annotation.PublicApi
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.config.CookieFactory
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.FailResponse
-import com.wq.auth.web.common.response.Responses
-import com.wq.auth.web.common.response.SuccessResponse
+import com.wq.auth.web.common.response.CommonResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -19,12 +18,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
-import org.springframework.http.ResponseCookie
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
@@ -42,16 +38,11 @@ import java.util.concurrent.TimeUnit
 class SocialLoginController(
     private val socialLoginService: SocialLoginService,
     private val socialLinkService: SocialLinkService,
-
-    @Value("\${app.cookie.secure:false}")
-    private val cookieSecure: Boolean,
-
-    @Value("\${app.cookie.same-site:Strict}")
-    private val cookieSameSite: String
+    private val cookieFactory: CookieFactory,
 ) {
 
     /**
-     * 범용 소셜 로그인 처리
+     * 소셜 로그인 처리
      *
      * 프론트엔드에서 소셜 제공자로부터 받은 인가 코드를 사용하여
      * 사용자 정보를 조회하고 JWT 토큰을 발급합니다.
@@ -70,8 +61,8 @@ class SocialLoginController(
             - 프론트엔드 환경별로 다른 URI 사용 가능 (개발/스테이징/프로덕션)
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
             
             **지원 소셜 제공자:**
             - GOOGLE: Google OAuth2
@@ -83,23 +74,23 @@ class SocialLoginController(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                description = "로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "잘못된 요청 (필수 필드 누락, 잘못된 형식 등)",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "소셜 제공자 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -108,16 +99,12 @@ class SocialLoginController(
     fun socialLogin(
         @Valid @RequestBody request: SocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
-        // RefreshToken을 HttpOnly 쿠키에 설정
-        setRefreshTokenCookie(response, loginResult.refreshToken)
+        setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
 
-        // Authorization 헤더에 AccessToken 설정
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
-
-        return Responses.success("소셜 로그인이 완료되었습니다")
+        return CommonResponse.success("소셜 로그인이 완료되었습니다")
     }
 
     /**
@@ -145,8 +132,9 @@ class SocialLoginController(
             - 프론트엔드 환경별로 다른 URI 사용 가능
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
+            - 기존 Authorization 헤더 방식은 보안 및 웹 친화적 설계를 위해 제거되었습니다.
             
             **쿠키 설정:**
             - HttpOnly: JavaScript 접근 불가 (XSS 방지)
@@ -158,23 +146,23 @@ class SocialLoginController(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "Google 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                description = "Google 로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Google 인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "Google API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -184,17 +172,13 @@ class SocialLoginController(
     fun googleLogin(
         @Valid @RequestBody request: GoogleSocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
 
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
-        // RefreshToken을 HttpOnly 쿠키에 설정
-        setRefreshTokenCookie(response, loginResult.refreshToken)
+        setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
 
-        // Authorization 헤더에 AccessToken 설정
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
-
-        return Responses.success("Google 로그인이 완료되었습니다")
+        return CommonResponse.success("Google 로그인이 완료되었습니다")
     }
 
     /**
@@ -225,31 +209,32 @@ class SocialLoginController(
             - 보안 강화를 위해 사용 권장
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
+            - 기존 Authorization 헤더 방식은 보안 및 웹 친화적 설계를 위해 제거되었습니다.
         """
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "카카오 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                description = "카카오 로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "카카오 인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "카카오 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -259,17 +244,13 @@ class SocialLoginController(
     fun kakaoLogin(
         @Valid @RequestBody request: KakaoSocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
 
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
-        // RefreshToken을 HttpOnly 쿠키에 설정
-        setRefreshTokenCookie(response, loginResult.refreshToken)
+        setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
 
-        // Authorization 헤더에 AccessToken 설정
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
-
-        return Responses.success("카카오 로그인이 완료되었습니다")
+        return CommonResponse.success("카카오 로그인이 완료되었습니다")
     }
 
     /**
@@ -297,8 +278,9 @@ class SocialLoginController(
             - 프론트엔드 환경별로 다른 URI 사용 가능
             
             **토큰 반환 방식:**
-            - Access Token: Authorization 헤더에 Bearer 방식으로 반환
-            - Refresh Token: HttpOnly 쿠키로 설정 (XSS 공격 방지)
+            - Access Token: HttpOnly 쿠키(`accessToken`)로 설정
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)로 설정 (XSS 공격 방지)
+            - 기존 Authorization 헤더 방식은 보안 및 웹 친화적 설계를 위해 제거되었습니다.
             
             **쿠키 설정:**
             - HttpOnly: JavaScript 접근 불가 (XSS 방지)
@@ -310,23 +292,23 @@ class SocialLoginController(
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "Naver 로그인 성공 - Authorization 헤더에 Bearer 토큰, HttpOnly 쿠키에 리프레시 토큰 설정",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                description = "Naver 로그인 성공 - HttpOnly 쿠키에 액세스 토큰 및 리프레시 토큰 설정",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Naver 인가 코드가 유효하지 않거나 만료됨",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "Naver API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -336,16 +318,12 @@ class SocialLoginController(
     fun naverLogin(
         @Valid @RequestBody request: NaverSocialLoginRequestDto,
         response: HttpServletResponse
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
 
-        // RefreshToken을 HttpOnly 쿠키에 설정
-        setRefreshTokenCookie(response, loginResult.refreshToken)
+        setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
 
-        // Authorization 헤더에 AccessToken 설정
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${loginResult.accessToken}")
-
-        return Responses.success("Naver 로그인이 완료되었습니다")
+        return CommonResponse.success("Naver 로그인이 완료되었습니다")
     }
 
     /**
@@ -372,7 +350,7 @@ class SocialLoginController(
             - 연동 계정이 있는 경우: 두 계정 자동 병합 (기존 회원 정보 유지)
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -381,22 +359,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "Google 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자 또는 Google 인가 코드가 유효하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "Google API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -406,16 +384,17 @@ class SocialLoginController(
     fun linkGoogleAccount(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: GoogleSocialLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val serviceRequest = SocialLinkRequestDto(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             providerType = ProviderType.GOOGLE,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
 
-        return Responses.success("Google 계정 연동이 완료되었습니다")
+        return CommonResponse.success("Google 계정 연동이 완료되었습니다")
     }
 
     /**
@@ -446,7 +425,7 @@ class SocialLoginController(
             - 보안 강화를 위해 사용 권장
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -455,22 +434,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "카카오 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자 또는 카카오 인가 코드가 유효하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "카카오 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -480,16 +459,17 @@ class SocialLoginController(
     fun linkKakaoAccount(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: KakaoSocialLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val serviceRequest = SocialLinkRequestDto(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             providerType = ProviderType.KAKAO,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
 
-        return Responses.success("카카오 계정 연동이 완료되었습니다")
+        return CommonResponse.success("카카오 계정 연동이 완료되었습니다")
     }
 
     /**
@@ -520,7 +500,7 @@ class SocialLoginController(
             - 프론트엔드에서 생성한 state 값을 전달해야 함
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -529,22 +509,22 @@ class SocialLoginController(
             ApiResponse(
                 responseCode = "200",
                 description = "네이버 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인가 코드(code) 또는 state 파라미터가 누락되거나 잘못된 형식",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자 또는 네이버 인가 코드가 유효하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "네이버 API 호출 실패 또는 서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -554,41 +534,36 @@ class SocialLoginController(
     fun linkNaverAccount(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: NaverSocialLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         val serviceRequest = SocialLinkRequestDto(
             authCode = request.authCode,
             codeVerifier = request.codeVerifier,
             state = request.state,
             providerType = ProviderType.NAVER,
+            redirectUri = request.redirectUri,
         )
 
         socialLinkService.processSocialLink(principalDetail.opaqueId, serviceRequest.toDomain())
 
-        return Responses.success("네이버 계정 연동이 완료되었습니다")
+        return CommonResponse.success("네이버 계정 연동이 완료되었습니다")
     }
 
     /**
-     * RefreshToken을 HttpOnly 쿠키로 설정합니다.
-     *
-     * Spring Boot 3.x의 ResponseCookie를 사용하여 현대적이고 안전한 쿠키를 생성합니다.
-     * - HttpOnly: JavaScript 접근 불가 (XSS 방지)
-     * - Secure: HTTPS에서만 전송 (프로덕션 환경)
-     * - SameSite: CSRF 공격 방지
-     * - MaxAge: 14일 (리프레시 토큰 만료 시간과 동일)
+     * AccessToken/RefreshToken을 HttpOnly 쿠키로 설정합니다.
      *
      * @param response HTTP 응답 객체
+     * @param accessToken 액세스 토큰
      * @param refreshToken 리프레시 토큰
      */
-    private fun setRefreshTokenCookie(response: HttpServletResponse, refreshToken: String) {
-        val cookie = ResponseCookie.from("refreshToken", refreshToken)
-            .httpOnly(true)                              // XSS 공격 방지
-            .secure(cookieSecure)                                  // 환경별 설정 (개발: false, 프로덕션: true)
-            .path("/")                                      // 모든 경로에서 쿠키 사용 가능
-            .maxAge(Duration.ofDays(14))          // 14일 만료
-            .domain(".easyappfactory.com")  // 모든 서브도메인 포함
-            .sameSite("Lax")  //SSO 리다이렉트 시 쿠키 전송을 위해 Lax 권장                          // CSRF 공격 방지 (Strict/Lax/None)
-            .build()
+    private fun setTokenCookies(
+        response: HttpServletResponse,
+        accessToken: String,
+        refreshToken: String,
+    ) {
+        val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
+        val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(refreshToken)
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString())
+        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
     }
 }

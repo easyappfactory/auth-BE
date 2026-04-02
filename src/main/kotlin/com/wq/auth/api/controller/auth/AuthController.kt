@@ -8,26 +8,28 @@ import com.wq.auth.api.controller.auth.response.LoginResponseDto
 import com.wq.auth.api.controller.auth.response.RefreshAccessTokenResponseDto
 import com.wq.auth.api.domain.auth.AuthService
 import com.wq.auth.api.domain.email.AuthEmailService
+import com.wq.auth.api.domain.member.MemberService
+import com.wq.auth.security.JwtAuthenticationFilter
 import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.annotation.PublicApi
-import com.wq.auth.security.jwt.JwtProperties
+import com.wq.auth.security.jwt.JwtProvider
+import com.wq.auth.security.jwt.error.JwtException
+import com.wq.auth.security.jwt.error.JwtExceptionCode
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.config.CookieFactory
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.BaseResponse
-import com.wq.auth.web.common.response.FailResponse
-import com.wq.auth.web.common.response.Responses
-import com.wq.auth.web.common.response.SuccessResponse
+import com.wq.auth.web.common.response.CommonResponse
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
-import org.springframework.http.ResponseCookie
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import java.util.concurrent.TimeUnit
@@ -37,14 +39,11 @@ import java.util.concurrent.TimeUnit
 class AuthController(
     private val authService: AuthService,
     private val emailService: AuthEmailService,
-    private val jwtProperties: JwtProperties,
-
-    @Value("\${app.cookie.secure:false}")
-    private val cookieSecure: Boolean,
-
-    @Value("\${app.cookie.same-site:Strict}")
-    private val cookieSameSite: String,
+    private val memberService: MemberService,
+    private val cookieFactory: CookieFactory,
+    private val jwtProvider: JwtProvider,
 ) {
+    private val log = KotlinLogging.logger {}
 
     @Operation(
         summary = "이메일 로그인",
@@ -56,56 +55,49 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그인 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "이메일 인증 실패",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "회원 정보를 저장하는데 실패했습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
     @RateLimit(limit = 5, duration = 15, timeUnit = TimeUnit.MINUTES)
-    @PostMapping("api/v1/auth/members/email-login")
+    @PostMapping("/api/v1/auth/members/email-login")
     @PublicApi
     fun emailLogin(
         response: HttpServletResponse,
         @RequestHeader("X-Client-Type", required = true) clientType: String,
         @RequestBody req: EmailLoginRequestDto,
 
-        ): SuccessResponse<LoginResponseDto> {
+        ): CommonResponse<LoginResponseDto> {
         emailService.verifyCode(req.email, req.verifyCode)
         val (accessToken, newRefreshToken) = authService.emailLogin(
             req.email,
             deviceId = req.deviceId,
         )
 
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${accessToken}")
+        val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
+        val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(newRefreshToken)
+        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
 
         if (clientType == "web") {
-            val refreshCookie = ResponseCookie.from("refreshToken", newRefreshToken)
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .path("/")
-                .maxAge(jwtProperties.refreshExp.toSeconds())
-                .domain(".easyappfactory.com")  // 모든 서브도메인 포함
-                .sameSite("Lax")  //SSO 리다이렉트 시 쿠키 전송을 위해 Lax 권장
-                .build()
-            response.addHeader("Set-Cookie", refreshCookie.toString())
-
-            return Responses.success(message = "로그인에 성공했습니다.", data = null)
+            return CommonResponse.success(message = "로그인에 성공했습니다.", data = null)
         }
 
         //앱
         val resp = LoginResponseDto.forApp(
             refreshToken = newRefreshToken
         )
-        return Responses.success(message = "로그인에 성공했습니다.", data = resp)
+        return CommonResponse.success(message = "로그인에 성공했습니다.", data = resp)
     }
 
 
@@ -133,7 +125,7 @@ class AuthController(
             - 인증 코드 삭제
             
             **인증 요구사항:**
-            - Authorization 헤더에 유효한 JWT 토큰 필요
+            - `accessToken` HttpOnly 쿠키에 유효한 JWT 토큰 필요
             - 토큰은 재발급되지 않으며 기존 토큰 그대로 사용
         """
     )
@@ -142,22 +134,22 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "이메일 계정 연동 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "인증 코드가 존재하지 않거나, 만료되었거나, 일치하지 않음",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증되지 않은 사용자",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "서버 내부 오류",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
@@ -167,9 +159,9 @@ class AuthController(
     fun verifyEmailLink(
         @AuthenticationPrincipal principalDetail: PrincipalDetails,
         @Valid @RequestBody request: EmailLoginLinkRequestDto
-    ): SuccessResponse<Void> {
+    ): CommonResponse<Void> {
         authService.processEmailLoginLink(principalDetail.opaqueId, request.toDomain())
-        return Responses.success("이메일 계정이 성공적으로 연동되었습니다.")
+        return CommonResponse.success("이메일 계정이 성공적으로 연동되었습니다.")
     }
 
     @Operation(
@@ -182,24 +174,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그아웃 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "로그아웃에 실패했습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
     @RateLimit(limit = 10, duration = 1, timeUnit = TimeUnit.MINUTES)
-    @PostMapping("api/v1/auth/members/logout")
+    @PostMapping("/api/v1/auth/members/logout")
     @PublicApi
     fun logout(
         @CookieValue(name = "refreshToken", required = false) refreshToken: String?,
         response: HttpServletResponse,
         @RequestHeader(name = "X-Client-Type", required = true) clientType: String,
         @RequestBody req: LogoutRequestDto?
-    ): SuccessResponse<Void?> {
+    ): CommonResponse<Void?> {
 
         val currentRefreshToken = when (clientType) {
             "web" -> refreshToken
@@ -210,18 +202,13 @@ class AuthController(
         authService.logout(currentRefreshToken)
 
         if (clientType == "web") {
-            val refreshCookie = ResponseCookie.from("refreshToken", "")
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .path("/")
-                .maxAge(0)
-                .sameSite(cookieSameSite)
-                .build()
-            response.addHeader("Set-Cookie", refreshCookie.toString())
-
+            val expireAccessTokenCookie = cookieFactory.expireAccessTokenCookie()
+            val expireRefreshTokenCookie = cookieFactory.expireRefreshTokenCookie()
+            response.addHeader(HttpHeaders.SET_COOKIE, expireAccessTokenCookie.toString())
+            response.addHeader(HttpHeaders.SET_COOKIE, expireRefreshTokenCookie.toString())
         }
         //앱
-        return Responses.success(message = "로그아웃에 성공했습니다.", data = null)
+        return CommonResponse.success(message = "로그아웃에 성공했습니다.", data = null)
     }
 
     @Operation(
@@ -240,10 +227,10 @@ class AuthController(
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "잘못된 요청, 인증 토큰이 없음, Authorization 헤더는 'Bearer <token>' 형식이어야 합니다.",
+                description = "잘못된 요청, 인증 토큰이 없음",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = BaseResponse::class)
+                    schema = Schema(implementation = CommonResponse::class)
                 )]
             ),
             ApiResponse(
@@ -251,7 +238,7 @@ class AuthController(
                 description = "유효하지 않은 토큰, 만료된 토큰, 유효하지 않은 서명, 지원되지 않는 토큰",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = BaseResponse::class)
+                    schema = Schema(implementation = CommonResponse::class)
                 )]
             ),
             ApiResponse(
@@ -259,52 +246,144 @@ class AuthController(
                 description = "refreshToken 조회 실패",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = BaseResponse::class)
+                    schema = Schema(implementation = CommonResponse::class)
                 )]
             )
         ]
     )
     @RateLimit(limit = 20, duration = 1, timeUnit = TimeUnit.HOURS)
-    @PostMapping("api/v1/auth/members/refresh")
+    @PostMapping("/api/v1/auth/members/refresh")
     @PublicApi
     fun refreshAccessToken(
-        @CookieValue(name = "refreshToken", required = false) refreshToken: String,
+        request: HttpServletRequest, // 헤더/쿠키에서 이전 AT를 읽기 위함
+        @CookieValue(name = "refreshToken", required = false) refreshToken: String?,
         @RequestHeader("X-Client-Type") clientType: String,
         response: HttpServletResponse,
         @RequestBody req: RefreshAccessTokenRequestDto?,
-    ): SuccessResponse<RefreshAccessTokenResponseDto> {
-        
-        val currentRefreshToken : String?
-        if(clientType == "web") {
-            currentRefreshToken = refreshToken
+    ): CommonResponse<RefreshAccessTokenResponseDto> {
+
+        val currentRefreshToken : String? = if(clientType == "web") {
+            refreshToken
         } else {
-            currentRefreshToken = req?.refreshToken
+            req?.refreshToken
         }
+
+        if (currentRefreshToken.isNullOrBlank()) {
+            throw JwtException(JwtExceptionCode.TOKEN_MISSING)
+        }
+
         val (accessToken, newRefreshToken) = authService.refreshAccessToken(
-            currentRefreshToken!!, req?.deviceId,
+            currentRefreshToken, req?.deviceId
         )
-        response.setHeader(HttpHeaders.AUTHORIZATION, "Bearer ${accessToken}")
+
+        val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
+        val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(newRefreshToken)
+        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
 
         if (clientType == "web") {
-
-            val refreshCookie = ResponseCookie.from("refreshToken", newRefreshToken)
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .path("/")
-                .maxAge(jwtProperties.refreshExp.toSeconds())
-                .sameSite(cookieSameSite)
-                .build()
-            response.addHeader("Set-Cookie", refreshCookie.toString())
-            
-            return Responses.success(message = "AccessToken 재발급에 성공했습니다.", data = null)
+            return CommonResponse.success(message = "AccessToken 재발급에 성공했습니다.", data = null)
         }
-        
+
         //앱
         val resp = RefreshAccessTokenResponseDto.forApp(
             refreshToken = newRefreshToken
         )
-        return Responses.success(message = "AccessToken 재발급에 성공했습니다.", data = resp)
+        return CommonResponse.success(message = "AccessToken 재발급에 성공했습니다.", data = resp)
 
     }
 
+    @Operation(
+        summary = "토큰 introspect",
+        description = """
+            API Gateway 연동용 엔드포인트입니다. 요청에 포함된 Access Token을 검증하고, 성공 시 응답 헤더에 사용자 정보를 담아 반환합니다.
+            
+            **토큰 탐색 우선순위:**
+            1. `accessToken` HttpOnly 쿠키
+               - 쿠키 값이 비어있으면 401을 반환합니다.
+            2. `Authorization: Bearer <token>` 헤더 (쿠키가 없을 때만 사용)
+            
+            **토큰 반환 방식:**
+            - Access Token: HttpOnly 쿠키(`accessToken`)
+            - Refresh Token: HttpOnly 쿠키(`refreshToken`)
+            - 기존 Authorization 헤더는 더 이상 사용하지 않습니다.
+            
+            **사일런트 리프레시 (Silent Refresh):**
+            - Access Token이 만료되었거나 남은 유효 시간이 5분(300초) 미만이면 `refreshToken` 쿠키로 자동 재발급을 시도합니다.
+            - 재발급 성공 시 응답의 `Set-Cookie`로 새 토큰을 내려주며 FE/사용자 개입이 불필요합니다.
+            - 재발급 실패(리프레시 토큰 만료·오류) 시 기존 쿠키를 모두 삭제하고 401을 반환합니다.
+            
+            **성공 응답 헤더:**
+            - `X-User-Id`: 사용자 UUID (opaqueId)
+        """
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "인트로스펙트 성공 (X-User-Id 헤더 포함). AT가 임박한 경우 Set-Cookie로 새 토큰도 포함됩니다.",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "토큰 없음, 빈 쿠키, 리프레시 토큰 만료·오류 등 인증 실패. 쿠키가 존재하던 경우 해당 쿠키는 제거됩니다.",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
+            )
+        ]
+    )
+    @RateLimit(limit = 60, duration = 1, timeUnit = TimeUnit.MINUTES)
+    @PublicApi
+    @GetMapping("/api/v1/auth/introspect")
+    fun introspect(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ) {
+        val token = JwtAuthenticationFilter.extractToken(request)
+        // 쿠키·헤더 모두 없거나, accessToken 쿠키가 빈 값인 경우 401
+        if (token.isNullOrBlank()) {
+            throw JwtException(JwtExceptionCode.TOKEN_MISSING)
+        }
+
+        // AT가 만료(-1)되었거나 남은 시간이 5분(300초) 미만이면 사일런트 리프레시 시도
+        val remainingSeconds = jwtProvider.getRemainingTimeSeconds(token)
+        val opaqueId: String = if (remainingSeconds < 300) {
+            val refreshToken = request.cookies?.firstOrNull { it.name == "refreshToken" }?.value
+
+            if (refreshToken.isNullOrBlank()) {
+                clearAuthCookies(response)
+                throw JwtException(JwtExceptionCode.TOKEN_MISSING)
+            }
+
+            try {
+                // 만료된 AT에서도 claims를 읽어 deviceId를 추출합니다.
+                val claims = jwtProvider.getClaimsEvenIfExpired(token)
+                val deviceId = claims["deviceId"] as? String
+
+                val tokenResult = authService.refreshAccessToken(refreshToken, deviceId)
+
+                response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.createAccessTokenCookie(tokenResult.accessToken).toString())
+                response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.createRefreshTokenCookie(tokenResult.refreshToken).toString())
+
+                log.debug { "사일런트 리프레시 성공 (remainingSeconds=$remainingSeconds)" }
+
+                jwtProvider.getOpaqueId(tokenResult.accessToken)
+            } catch (e: Exception) {
+                log.warn { "사일런트 리프레시 실패: ${e.message}" }
+                clearAuthCookies(response)
+                throw JwtException(JwtExceptionCode.EXPIRED)
+            }
+        } else {
+            jwtProvider.getOpaqueId(token)
+        }
+
+        response.setHeader("X-User-Id", opaqueId)
+    }
+
+    /**
+     * accessToken, refreshToken HttpOnly 쿠키를 즉시 만료시킵니다.
+     */
+    private fun clearAuthCookies(response: HttpServletResponse) {
+        response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.expireAccessTokenCookie().toString())
+        response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.expireRefreshTokenCookie().toString())
+    }
 }

@@ -1,0 +1,25 @@
+# alpha — 알파 서버 (DDL update, 운영에 가까운 쿠키)
+spring:
+  config:
+    activate:
+      on-profile: alpha
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: true
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.springframework.orm.jpa: DEBUG
+
+app:
+  cookie:
+    domain: ${APP_COOKIE_DOMAIN}
+    secure: true
+    same-site: Strict

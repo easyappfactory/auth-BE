@@ -13,8 +13,11 @@ data class KakaoSocialLoginRequestDto(
 
     @field:NotBlank(message = "codeVerifier는 필수입니다")
     @field:Schema(description = "PKCE 검증용 코드 검증자 (카카오는 선택사항이지만 보안을 위해 권장)", example = "NgAfIySigI...IVxKxbmrpg")
-    val codeVerifier: String
+    val codeVerifier: String,
+
+    @field:Schema(description = "인가 요청 시 사용한 redirect_uri. 없으면 서버 기본값 사용.")
+    val redirectUri: String? = null,
 )
 
 fun KakaoSocialLoginRequestDto.toDomain(): SocialLoginRequest =
-    SocialLoginRequest(authCode, codeVerifier, null, ProviderType.KAKAO)
+    SocialLoginRequest(authCode, codeVerifier, null, ProviderType.KAKAO, redirectUri)

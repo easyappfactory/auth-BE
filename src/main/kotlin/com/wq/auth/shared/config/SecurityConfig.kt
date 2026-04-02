@@ -12,12 +12,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
-import org.springframework.web.cors.CorsConfigurationSource
 
 /**
  * Spring Security 설정 클래스
- * 
+ *
  * JWT 기반 인증을 위한 보안 설정을 구성합니다.
+ * CORS는 API Gateway에서만 처리하며, auth-BE에서는 비활성화합니다.
  */
 @Configuration
 @EnableWebSecurity
@@ -25,14 +25,13 @@ import org.springframework.web.cors.CorsConfigurationSource
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val jwtAuthenticationEntryPoint: JwtAuthenticationEntryPoint,
-    private val jwtAccessDeniedHandler: JwtAccessDeniedHandler,
-    private val corsConfigurationSource: CorsConfigurationSource
+    private val jwtAccessDeniedHandler: JwtAccessDeniedHandler
 ) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return http
-            .cors { it.configurationSource(corsConfigurationSource)  } //Security 필터 체인에 CORS 적용
+            .cors { it.disable() }  // CORS는 Gateway에서만 처리
             // CSRF 보호 비활성화 (JWT 사용 시 불필요)
             .csrf { it.disable() }
             
@@ -54,15 +53,16 @@ class SecurityConfig(
                     // 공개 엔드포인트 (인증 불필요)
                     .requestMatchers(
                         "/api/v1/auth/members/email-login", // 이메일 로그인
-                        "/api/v1/auth/email/request", // 이메일 일증 코드 요청
-                        "/api/v1/auth/members/refresh", //액세스 토큰 재발급
+                        "/api/v1/auth/email/request", // 이메일 인증 코드 요청
+                        "/api/v1/auth/email/verify", // 이메일 인증 코드 검증 (로그인 전 호출)
+                        "/api/v1/auth/members/refresh", // 액세스 토큰 재발급
                         "/api/public/**",         // 공개 API
                         "/api/v1/auth/*/login", // 소셜 로그인 API
-                        "api/v1/auth/members/logout", //로그아웃
+                        "/api/v1/auth/members/logout", //로그아웃
                         "/actuator/health",       // 헬스체크
                         "/swagger-ui/**",         // Swagger UI
                         "/v3/api-docs/**",        // OpenAPI 문서
-                        "/h2-console/**"          // H2 콘솔 (개발용)
+                        "/api/v1/auth/introspect"
                     ).permitAll()
                     
                     // 나머지 모든 요청은 인증 필요 (세부 권한은 @PreAuthorize로 처리)

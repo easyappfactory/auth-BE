@@ -18,8 +18,9 @@ class KakaoLoginProvider(
     override fun getUserInfo(request: SocialLoginRequest): OAuthUser {
         return kakaoOAuthClient.getUserFromAuthCode(
             OAuthAuthCodeRequest(
-                request.authCode,
-                request.codeVerifier
+                authCode = request.authCode,
+                codeVerifier = request.codeVerifier,
+                redirectUri = request.redirectUri,
             )
         )
     }

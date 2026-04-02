@@ -13,8 +13,11 @@ data class GoogleSocialLoginRequestDto(
 
     @field:NotBlank(message = "codeVerifier는 필수입니다")
     @field:Schema(description = "PKCE 검증용 코드 검증자", example = "NgAfIySigI...IVxKxbmrpg")
-    val codeVerifier: String
+    val codeVerifier: String,
+
+    @field:Schema(description = "인가 요청 시 사용한 redirect_uri. 허용 목록에 있을 때만 사용. 없으면 서버 기본값 사용.")
+    val redirectUri: String? = null,
 )
 
 fun GoogleSocialLoginRequestDto.toDomain(): SocialLoginRequest =
-    SocialLoginRequest(authCode, codeVerifier, null, ProviderType.GOOGLE)
+    SocialLoginRequest(authCode, codeVerifier, null, ProviderType.GOOGLE, redirectUri)

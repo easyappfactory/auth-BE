@@ -1,8 +1,7 @@
 package com.wq.auth.security
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.wq.auth.security.jwt.error.JwtExceptionCode
-import com.wq.auth.web.common.response.Responses
+import com.wq.auth.web.common.response.CommonResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -10,6 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.web.access.AccessDeniedHandler
 import org.springframework.stereotype.Component
+import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
 
 /**
@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets
  */
 @Component
 class JwtAccessDeniedHandler(
-    private val objectMapper: ObjectMapper
+    private val jsonMapper: JsonMapper
 ) : AccessDeniedHandler {
 
     private val log = KotlinLogging.logger {}
@@ -37,8 +37,8 @@ class JwtAccessDeniedHandler(
         response.characterEncoding = StandardCharsets.UTF_8.name()
 
         // 표준 API 응답 형식으로 에러 응답 생성
-        val errorResponse = Responses.fail(JwtExceptionCode.FORBIDDEN)
-        val jsonResponse = objectMapper.writeValueAsString(errorResponse)
+        val errorResponse = CommonResponse.fail(JwtExceptionCode.FORBIDDEN)
+        val jsonResponse = jsonMapper.writeValueAsString(errorResponse)
 
         response.writer.write(jsonResponse)
         response.writer.flush()

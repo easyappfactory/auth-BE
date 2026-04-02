@@ -6,7 +6,7 @@ import com.wq.auth.api.domain.email.AuthEmailService
 import com.wq.auth.api.domain.email.error.EmailException
 import com.wq.auth.security.annotation.PublicApi
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
-import com.wq.auth.web.common.response.*
+import com.wq.auth.web.common.response.CommonResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -31,39 +31,39 @@ class AuthEmailController(
             ApiResponse(
                 responseCode = "200",
                 description = "인증코드 발송 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "올바르지 않은 이메일 형식입니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "해당 도메인에 메일을 보낼 수 없습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "존재하지 않는 도메인입니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "500",
                 description = "이메일 인증코드 전송에 실패했습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
     @RateLimit(limit = 3, duration = 10, timeUnit = TimeUnit.MINUTES)
     @PublicApi
-    @PostMapping("api/v1/auth/email/request")
-    fun requestCode(@RequestBody req: EmailRequestDto): BaseResponse {
+    @PostMapping("/api/v1/auth/email/request")
+    fun requestCode(@RequestBody req: EmailRequestDto): CommonResponse<Unit> {
         return try {
             authEmailService.sendVerificationCode(req.email)
-            Responses.success(message = "해당 이메일로 인증코드가 발송되었습니다.", data = null)
+            CommonResponse.success(message = "해당 이메일로 인증코드가 발송되었습니다.")
         } catch (e: EmailException) {
-            Responses.fail(e.emailCode)
+            CommonResponse.fail(e.emailCode)
         }
     }
 
@@ -76,23 +76,23 @@ class AuthEmailController(
             ApiResponse(
                 responseCode = "200",
                 description = "인증 성공",
-                content = [Content(schema = Schema(implementation = SuccessResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "이메일 인증코드가 일치하지 않습니다.",
-                content = [Content(schema = Schema(implementation = FailResponse::class))]
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
             )
         ]
     )
     @RateLimit(limit = 10, duration = 5, timeUnit = TimeUnit.MINUTES)
-    @PostMapping("api/v1/auth/email/verify")
-    fun verifyCode(@RequestBody req: EmailVerifyRequestDto): BaseResponse {
+    @PostMapping("/api/v1/auth/email/verify")
+    fun verifyCode(@RequestBody req: EmailVerifyRequestDto): CommonResponse<Unit> {
         return try {
             authEmailService.verifyCode(req.email, req.verifyCode)
-            Responses.success(message = "인증되었습니다.", data = null)
+            CommonResponse.success(message = "인증되었습니다.")
         } catch (e: EmailException) {
-            Responses.fail(e.emailCode)
+            CommonResponse.fail(e.emailCode)
         }
     }
 }
