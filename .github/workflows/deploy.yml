@@ -1,66 +1,97 @@
-name: Deploy to EC2
+name: Deploy (auth-api)
+
+# ---------------------------------------------------------------------------
+# EC2 원격 경로 (아래 deploy job 의 env.PROJECT_ROOT 만 수정)
+#   PROJECT_ROOT … 배포 기준 루트. 예: ~, ~/myapp (끝 슬래시 없음)
+#   환경변수 파일은 항상 {PROJECT_ROOT}/env/ 아래 (이름 고정: env)
+#   배포는 EC2의 PROJECT_ROOT 에서 docker compose (서비스명: auth-api, V2 기준)
+# ---------------------------------------------------------------------------
+
 on:
   push:
     branches:
-      - main   # main에 push될 때만 실행
+      - main
+      - dev
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'alpha' }}
+    env:
+      PROJECT_ROOT: '~/apps'
+
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image tag and Spring profile
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "IMAGE_TAG=prod" >> $GITHUB_ENV
+            echo "SPRING_PROFILE=prod" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=alpha" >> $GITHUB_ENV
+            echo "SPRING_PROFILE=alpha" >> $GITHUB_ENV
+          fi
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          secrets: |
+            "GITHUB_TOKEN=${{ secrets.GIT_TOKEN }}"
+          build-args: |
+            GITHUB_ACTOR=${{ github.actor }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/auth-server:${{ env.IMAGE_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/auth-server:${{ github.sha }}
+
       - name: Setup SSH
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/ec2_key.pem
+          printf '%s' "${{ secrets.EC2_KEY }}" > /tmp/ec2_key_src
+          if [[ ! -s /tmp/ec2_key_src ]]; then
+            echo "::error::EC2_KEY secret is empty" >&2
+            exit 1
+          fi
+          if head -n 1 /tmp/ec2_key_src | grep -q '^[[:space:]]*-----BEGIN'; then
+            cp /tmp/ec2_key_src ~/.ssh/ec2_key.pem
+          else
+            tr -d '\n\r \t' < /tmp/ec2_key_src | base64 --decode > ~/.ssh/ec2_key.pem || {
+              echo "::error::EC2_KEY is not PEM and base64 decode failed" >&2
+              exit 1
+            }
+          fi
+          rm -f /tmp/ec2_key_src
           chmod 600 ~/.ssh/ec2_key.pem
+
+      - name: Create env file and copy to EC2
+        run: |
+          printf '%s\n' "${{ secrets.AUTH_BE_ENV_FILE }}" > auth-api.env
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ${{ env.PROJECT_ROOT }}/env'
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-api.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ env.PROJECT_ROOT }}/env/auth-api.env
+
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/${USER}/app
-            git pull origin main
-            ./gradlew build -x test
-            
-            # systemd 서비스 파일에 모든 환경변수 포함
-            sudo tee /etc/systemd/system/authBE.service > /dev/null << 'SERVICEEOF'
-            [Unit]
-            Description=AuthBE Spring Boot App
-            After=network.target
-            
-            [Service]
-            Type=simple
-            User=ec2-user
-            WorkingDirectory=/home/ec2-user/app
-            ExecStart=/usr/bin/java -jar /home/ec2-user/app/build/libs/demo-0.0.1-SNAPSHOT.jar
-            Environment="DB_NAME=${{ secrets.DB_NAME }}"
-            Environment="DB_USER=${{ secrets.DB_USER }}"
-            Environment="DB_PASSWORD=${{ secrets.DB_PASSWORD }}"
-            Environment="DB_HOST=${{ secrets.DB_HOST }}"
-            Environment="DB_PORT=${{ secrets.DB_PORT }}"
-            Environment="GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
-            Environment="GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
-            Environment="GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}"
-            Environment="KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}"
-            Environment="KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}"
-            Environment="KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}"
-            Environment="NAVER_CLIENT_ID=${{ secrets.NAVER_CLIENT_ID }}"
-            Environment="NAVER_CLIENT_SECRET=${{ secrets.NAVER_CLIENT_SECRET }}"
-            Environment="NAVER_REDIRECT_URI=${{ secrets.NAVER_REDIRECT_URI }}"
-            Environment="JWT_ACCESS_TOKEN_EXPIRATION=${{ secrets.JWT_ACCESS_TOKEN_EXPIRATION }}"
-            Environment="JWT_REFRESH_TOKEN_EXPIRATION=${{ secrets.JWT_REFRESH_TOKEN_EXPIRATION }}"
-            Environment="JWT_SECRET=${{ secrets.JWT_SECRET }}"
-            Environment="MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}"
-            Environment="MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}"
-            Environment="SWAGGER_PATH=${{ secrets.SWAGGER_PATH }}"
-            Environment="USER=${{ secrets.USER }}"
-            Restart=always
-            RestartSec=10
-            
-            [Install]
-            WantedBy=multi-user.target
-          SERVICEEOF
-            
-            sudo systemctl daemon-reload
-            sudo systemctl restart authBE
-            sudo systemctl enable authBE
-          EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+          set -e
+          export PATH="/usr/bin:/usr/local/bin:$PATH"
+          export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+          export IMAGE_TAG="${{ env.IMAGE_TAG }}"
+          export SPRING_PROFILES_ACTIVE="${{ env.SPRING_PROFILE }}"
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          cd ${{ env.PROJECT_ROOT }}
+          docker compose stop auth-api || true
+          docker compose rm -f auth-api || true
+          docker compose pull auth-api
+          docker compose up -d --no-deps --force-recreate auth-api
+          docker logout
+          '
