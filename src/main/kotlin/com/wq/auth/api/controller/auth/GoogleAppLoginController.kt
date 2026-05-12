@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RestController
 import java.util.concurrent.TimeUnit
 
@@ -38,9 +37,6 @@ class GoogleAppLoginController(
 
             앱은 Google Credential Manager를 통해 발급받은 **ID Token**을 그대로 전달합니다.
             서버는 Google 라이브러리를 사용해 ID Token을 직접 검증하며, 구글 서버와의 추가 통신이 불필요합니다.
-
-            **필수 헤더:**
-            - `X-Client-Id: easy-snap-and-app`
 
             **응답:**
             - 인증 성공 시 자체 JWT(accessToken, refreshToken)를 JSON Body에 반환합니다.
@@ -70,7 +66,6 @@ class GoogleAppLoginController(
     @PublicApi("Google 앱 로그인")
     @PostMapping("/api/v1/auth/google/login/app")
     fun loginWithApp(
-        @RequestHeader("X-Client-Id") clientId: String,
         @Valid @RequestBody request: GoogleAppLoginRequestDto,
     ): CommonResponse<SocialLoginResponseDto> {
         val loginResult = googleAppLoginService.login(request.idToken)
