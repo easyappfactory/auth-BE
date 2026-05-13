@@ -52,6 +52,8 @@ app:
     default-zone: ${APP_DEFAULT_ZONE:Asia/Seoul}
   cookie:
     domain: ${APP_COOKIE_DOMAIN:localhost}
+  internal:
+    secret: ${INTERNAL_API_SECRET}
 
 project:
   logging:
