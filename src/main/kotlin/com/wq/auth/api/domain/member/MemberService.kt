@@ -5,6 +5,7 @@ import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.member.error.MemberException
 import com.wq.auth.api.domain.member.error.MemberExceptionCode
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -13,6 +14,10 @@ class MemberService(
     private val memberRepository: MemberRepository,
     private val authProviderRepository: AuthProviderRepository,
     ) {
+
+    companion object {
+        private val log = LoggerFactory.getLogger(MemberService::class.java)
+    }
 
     data class UserInfoResult(
         val userId: String,
@@ -34,15 +39,24 @@ class MemberService(
 
     @Transactional(readOnly = true)
     fun getUserInfo(opaqueId: String): UserInfoResult {
+        log.debug("[MemberService] getUserInfo - opaqueId={}", opaqueId)
+
         val member = memberRepository.findByOpaqueId(opaqueId)
-            .orElseThrow { MemberException(MemberExceptionCode.USER_INFO_RETRIEVE_FAILED)}
+            .orElseThrow {
+                log.warn("[MemberService] 회원 없음 - opaqueId={}", opaqueId)
+                MemberException(MemberExceptionCode.USER_INFO_RETRIEVE_FAILED)
+            }
 
         val authProviders = authProviderRepository.findByMember(member)
         if (authProviders.isEmpty()) {
+            log.warn("[MemberService] authProvider 없음 - opaqueId={}, memberId={}", opaqueId, member.id)
             throw MemberException(MemberExceptionCode.USER_INFO_RETRIEVE_FAILED)
         }
 
         val email = member.primaryEmail
+        if (email == null) {
+            log.error("[MemberService] primaryEmail이 null - opaqueId={}, memberId={}", opaqueId, member.id)
+        }
         val providers = authProviders.map { it.providerType }
 
         //TODO
