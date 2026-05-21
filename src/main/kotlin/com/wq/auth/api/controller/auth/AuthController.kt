@@ -338,8 +338,8 @@ class AuthController(
         request: HttpServletRequest,
         response: HttpServletResponse,
     ) {
-        // X-Client-Id가 "web"이면 웹, 그 외(easy-snap-app 등)면 앱
-        val isApp = request.getHeader("X-Client-Id") != "web"
+        // X-Client-Type이 "web"이면 웹, 그 외(app 등)면 앱 (API Gateway가 RT 출처 기반으로 주입)
+        val isApp = request.getHeader("X-Client-Type") != "web"
 
         val token = JwtAuthenticationFilter.extractToken(request)
 
