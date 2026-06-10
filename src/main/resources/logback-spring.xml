@@ -1,48 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <springProperty scope="context" name="project.logging.env" source="project.logging.env" defaultValue="alpha"/>
+    <include resource="base-logback.xml"/>
 
-    <!-- Alloy가 기대하는 'service'와 'env' 필드명을 컨텍스트에 직접 등록 -->
-    <springProperty scope="context" name="springAppName" source="spring.application.name"/>
-    <property scope="context" name="service" value="${SERVICE_NAME:-${springAppName}}"/>
-    <springProperty scope="context" name="env" source="project.logging.env" defaultValue="local"/>
-
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp>
-                    <timeZone>UTC</timeZone>
-                </timestamp>
-                <version/>
-                <logLevel/>
-                <threadName/>
-                <loggerName/>
-                <message/>
-                <context/> <!-- 여기서 service, env가 자동으로 포함됨 -->
-                <pattern>
-                    <pattern>
-                        {
-                        "trace_id": "%mdc{trace_id}"
-                        }
-                    </pattern>
-                </pattern>
-                <mdc/>
-                <stackTrace/>
-            </providers>
-        </encoder>
-    </appender>
-
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-    </root>
-
-    <!-- local, alpha 환경에서만 Hibernate SQL 로깅 (JSON 한 줄) -->
-    <springProfile name="local, alpha">
-        <logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
-            <appender-ref ref="CONSOLE"/>
-        </logger>
-        <logger name="org.hibernate.orm.jdbc.bind" level="TRACE" additivity="false">
-            <appender-ref ref="CONSOLE"/>
-        </logger>
+    <springProfile name="alpha,prod">
+        <root level="INFO">
+            <appender-ref ref="JSON_STDOUT"/>
+        </root>
+        <!-- 개발자 코드: trace 포함 전부 출력 -->
+        <logger name="com.wq.auth" level="TRACE"/>
+        <!-- 프레임워크 노이즈 억제 -->
+        <logger name="org.hibernate" level="WARN"/>
+        <logger name="com.zaxxer.hikari" level="WARN"/>
+        <logger name="org.springframework.boot.autoconfigure" level="WARN"/>
+        <logger name="org.springframework.boot.web" level="WARN"/>
+        <logger name="org.springframework.data" level="WARN"/>
+        <logger name="org.springframework.orm" level="WARN"/>
+        <logger name="org.springframework.web" level="WARN"/>
+        <logger name="org.springframework.security" level="WARN"/>
     </springProfile>
 </configuration>

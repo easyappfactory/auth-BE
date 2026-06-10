@@ -1,4 +1,8 @@
 # prod — 운영 (RDS SSL, DDL validate, 쿠키 Strict)
+project:
+  logging:
+    env: prod
+
 spring:
   config:
     activate:

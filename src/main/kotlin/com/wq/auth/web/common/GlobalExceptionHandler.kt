@@ -21,9 +21,12 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException::class)
     fun handleApiException(e: ApiException): ResponseEntity<CommonResponse<Unit>> {
-
-        log.error(e.extractExceptionLocation() + e.message)
         val status = HttpStatus.valueOf(e.code.status)
+        if (status.is4xxClientError) {
+            log.info("[{}] {} - {}", status.value(), e.code, e.message)
+        } else {
+            log.error(e.extractExceptionLocation() + e.message, e)
+        }
         val body = CommonResponse.fail(e.code)
         return ResponseEntity.status(status).body(body)
     }
@@ -39,7 +42,7 @@ class GlobalExceptionHandler {
     // 예상 못 한 예외 처리
     @ExceptionHandler(Exception::class)
     fun handleUnexpected(e: Exception): ResponseEntity<CommonResponse<Unit>> {
-        log.error("[예상치 못한 예외 발생] $e")
+        log.error("[예상치 못한 예외 발생] ${e.message}", e)
         val status = HttpStatus.INTERNAL_SERVER_ERROR
         val body = CommonResponse.fail(
             CommonExceptionCode.INTERNAL_SERVER_ERROR

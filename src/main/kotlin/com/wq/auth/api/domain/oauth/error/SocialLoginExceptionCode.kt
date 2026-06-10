@@ -17,6 +17,7 @@ enum class SocialLoginExceptionCode(
     GOOGLE_TOKEN_REQUEST_FAILED(400, "Google 액세스 토큰 요청이 실패했습니다"),
     GOOGLE_USER_INFO_REQUEST_FAILED(400, "Google 사용자 정보 조회가 실패했습니다"),
     GOOGLE_INVALID_ACCESS_TOKEN(401, "유효하지 않은 Google 액세스 토큰입니다"),
+    GOOGLE_INVALID_ID_TOKEN(401, "유효하지 않은 Google ID Token입니다"),
     GOOGLE_SERVER_ERROR(502, "Google 서버에서 일시적인 오류가 발생했습니다"),
     
     // 카카오 OAuth 관련 예외

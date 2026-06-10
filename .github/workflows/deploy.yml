@@ -12,6 +12,26 @@ on:
     branches:
       - main
       - dev
+    # 문서·README만 변경된 경우 이미지 빌드/EC2 배포 불필요
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+
+  # 수동 실행을 가능하게 하는 설정
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '배포 환경 선택'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      reason:
+        description: '배포 사유를 입력하세요'
+        required: false
+        type: string
 
   # 수동 실행을 가능하게 하는 설정
   workflow_dispatch:

@@ -101,9 +101,7 @@ class SocialLoginController(
         response: HttpServletResponse
     ): CommonResponse<Void> {
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
-
         setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
-
         return CommonResponse.success("소셜 로그인이 완료되었습니다")
     }
 
@@ -173,11 +171,8 @@ class SocialLoginController(
         @Valid @RequestBody request: GoogleSocialLoginRequestDto,
         response: HttpServletResponse
     ): CommonResponse<Void> {
-
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
-
         setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
-
         return CommonResponse.success("Google 로그인이 완료되었습니다")
     }
 
@@ -245,11 +240,8 @@ class SocialLoginController(
         @Valid @RequestBody request: KakaoSocialLoginRequestDto,
         response: HttpServletResponse
     ): CommonResponse<Void> {
-
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
-
         setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
-
         return CommonResponse.success("카카오 로그인이 완료되었습니다")
     }
 
@@ -320,9 +312,7 @@ class SocialLoginController(
         response: HttpServletResponse
     ): CommonResponse<Void> {
         val loginResult = socialLoginService.processSocialLogin(request.toDomain())
-
         setTokenCookies(response, loginResult.accessToken, loginResult.refreshToken)
-
         return CommonResponse.success("Naver 로그인이 완료되었습니다")
     }
 
@@ -550,10 +540,6 @@ class SocialLoginController(
 
     /**
      * AccessToken/RefreshToken을 HttpOnly 쿠키로 설정합니다.
-     *
-     * @param response HTTP 응답 객체
-     * @param accessToken 액세스 토큰
-     * @param refreshToken 리프레시 토큰
      */
     private fun setTokenCookies(
         response: HttpServletResponse,
@@ -562,7 +548,6 @@ class SocialLoginController(
     ) {
         val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
         val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(refreshToken)
-
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
     }

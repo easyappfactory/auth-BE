@@ -1,4 +1,8 @@
 # alpha — 알파 서버 (DDL update, 운영에 가까운 쿠키)
+project:
+  logging:
+    env: alpha
+
 spring:
   config:
     activate:

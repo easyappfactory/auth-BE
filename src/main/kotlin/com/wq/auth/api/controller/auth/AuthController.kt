@@ -262,7 +262,7 @@ class AuthController(
         @RequestBody req: RefreshAccessTokenRequestDto?,
     ): CommonResponse<RefreshAccessTokenResponseDto> {
 
-        val currentRefreshToken : String? = if(clientType == "web") {
+        val currentRefreshToken: String? = if (clientType == "web") {
             refreshToken
         } else {
             req?.refreshToken
@@ -338,45 +338,69 @@ class AuthController(
         request: HttpServletRequest,
         response: HttpServletResponse,
     ) {
+        // X-Client-Type이 "web"이면 웹, 그 외(app 등)면 앱 (API Gateway가 RT 출처 기반으로 주입)
+        val isApp = request.getHeader("X-Client-Type") != "web"
+
         val token = JwtAuthenticationFilter.extractToken(request)
-        // 쿠키·헤더 모두 없거나, accessToken 쿠키가 빈 값인 경우 401
-        if (token.isNullOrBlank()) {
-            throw JwtException(JwtExceptionCode.TOKEN_MISSING)
-        }
 
-        // AT가 만료(-1)되었거나 남은 시간이 5분(300초) 미만이면 사일런트 리프레시 시도
-        val remainingSeconds = jwtProvider.getRemainingTimeSeconds(token)
-        val opaqueId: String = if (remainingSeconds < 300) {
-            val refreshToken = request.cookies?.firstOrNull { it.name == "refreshToken" }?.value
-
-            if (refreshToken.isNullOrBlank()) {
-                clearAuthCookies(response)
-                throw JwtException(JwtExceptionCode.TOKEN_MISSING)
-            }
-
-            try {
-                // 만료된 AT에서도 claims를 읽어 deviceId를 추출합니다.
-                val claims = jwtProvider.getClaimsEvenIfExpired(token)
-                val deviceId = claims["deviceId"] as? String
-
-                val tokenResult = authService.refreshAccessToken(refreshToken, deviceId)
-
-                response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.createAccessTokenCookie(tokenResult.accessToken).toString())
-                response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.createRefreshTokenCookie(tokenResult.refreshToken).toString())
-
-                log.debug { "사일런트 리프레시 성공 (remainingSeconds=$remainingSeconds)" }
-
-                jwtProvider.getOpaqueId(tokenResult.accessToken)
-            } catch (e: Exception) {
-                log.warn { "사일런트 리프레시 실패: ${e.message}" }
-                clearAuthCookies(response)
-                throw JwtException(JwtExceptionCode.EXPIRED)
-            }
+        val opaqueId: String = if (token.isNullOrBlank()) {
+            // AT 없음 → RT로 silent refresh 시도
+            silentRefresh(request, response, isApp, deviceId = null)
         } else {
-            jwtProvider.getOpaqueId(token)
+            val remainingSeconds = jwtProvider.getRemainingTimeSeconds(token)
+            if (remainingSeconds < 300) {
+                // AT 만료 임박 또는 만료됨 → RT로 silent refresh 시도
+                val deviceId = runCatching { jwtProvider.getClaimsEvenIfExpired(token)["deviceId"] as? String }.getOrNull()
+                silentRefresh(request, response, isApp, deviceId)
+            } else {
+                // AT 유효
+                jwtProvider.getOpaqueId(token)
+            }
         }
 
         response.setHeader("X-User-Id", opaqueId)
+    }
+
+    /**
+     * RT로 AT/RT를 재발급하고 플랫폼에 맞게 응답에 설정합니다.
+     * - web: Set-Cookie
+     * - app: X-New-AT / X-New-RT 헤더
+     */
+    private fun silentRefresh(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        isApp: Boolean,
+        deviceId: String?,
+    ): String {
+        val refreshToken = if (isApp) {
+            request.getHeader("X-Refresh-Token")
+        } else {
+            request.cookies?.firstOrNull { it.name == "refreshToken" }?.value
+        }
+
+        if (refreshToken.isNullOrBlank()) {
+            if (!isApp) clearAuthCookies(response)
+            throw JwtException(JwtExceptionCode.TOKEN_MISSING)
+        }
+
+        return try {
+            val tokenResult = authService.refreshAccessToken(refreshToken, deviceId)
+
+            if (isApp) {
+                response.setHeader("X-New-AT", tokenResult.accessToken)
+                response.setHeader("X-New-RT", tokenResult.refreshToken)
+            } else {
+                response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.createAccessTokenCookie(tokenResult.accessToken).toString())
+                response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.createRefreshTokenCookie(tokenResult.refreshToken).toString())
+            }
+
+            log.debug { "사일런트 리프레시 성공 (isApp=$isApp)" }
+            jwtProvider.getOpaqueId(tokenResult.accessToken)
+        } catch (e: Exception) {
+            log.warn { "사일런트 리프레시 실패: ${e.message}" }
+            if (!isApp) clearAuthCookies(response)
+            throw JwtException(JwtExceptionCode.EXPIRED)
+        }
     }
 
     /**
