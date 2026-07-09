@@ -8,6 +8,7 @@ import com.wq.auth.api.domain.auth.AuthProviderRepository
 import com.wq.auth.api.domain.auth.AuthService
 import com.wq.auth.api.domain.auth.MemberConnector
 import com.wq.auth.api.domain.member.MemberRepository
+import com.wq.auth.api.domain.member.MemberStatsService
 import com.wq.auth.api.domain.auth.RefreshTokenRepository
 import com.wq.auth.api.domain.auth.entity.RefreshTokenEntity
 import com.wq.auth.api.domain.auth.error.AuthException
@@ -35,6 +36,7 @@ class AuthServiceTest : DescribeSpec({
     lateinit var jwtProvider: JwtProvider
     lateinit var nicknameGenerator: NicknameGenerator
     lateinit var memberConnector: MemberConnector
+    lateinit var memberStatsService: MemberStatsService
 
     beforeEach {
         authProviderRepository = mock()
@@ -44,6 +46,7 @@ class AuthServiceTest : DescribeSpec({
         jwtProvider = mock()
         nicknameGenerator = mock()
         memberConnector = mock()
+        memberStatsService = mock()
 
         authService = AuthService(
             authEmailService = authEmailService,
@@ -53,6 +56,7 @@ class AuthServiceTest : DescribeSpec({
             jwtProvider = jwtProvider,
             nicknameGenerator = nicknameGenerator,
             memberConnector = memberConnector,
+            memberStatsService = memberStatsService,
         )
     }
 
@@ -79,7 +83,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(mockAuthProvider.member).thenReturn(mockMember)
 
             whenever(authProviderRepository.findByEmailAndProviderType(email,ProviderType.EMAIL)).thenReturn(mockAuthProvider)
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(accessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(accessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(refreshToken)
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             
@@ -94,7 +98,7 @@ class AuthServiceTest : DescribeSpec({
             result.refreshToken shouldBe refreshToken
 
             verify(authProviderRepository).findByEmailAndProviderType(email, ProviderType.EMAIL)
-            verify(jwtProvider).createAccessToken(any(), any(), any())
+            verify(jwtProvider).createAccessToken(any(), any())
             verify(jwtProvider).createRefreshToken(any(), any())
             verify(refreshTokenRepository, times(1)).save(any<RefreshTokenEntity>())
         }
@@ -119,7 +123,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
             whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(refreshTokenEntity)
             whenever(jwtProvider.getRefreshTokenExpiredAt(refreshToken)).thenReturn(futureTime)
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(newAccessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(newAccessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(newRefreshToken)
             whenever(jwtProvider.getJti(newRefreshToken)).thenReturn(newJti)
             
@@ -137,7 +141,7 @@ class AuthServiceTest : DescribeSpec({
             verify(jwtProvider, times(1)).getJti(refreshToken)
             verify(jwtProvider, times(1)).getOpaqueId(refreshToken)
             verify(refreshTokenRepository, times(1)).findActiveByOpaqueIdAndJti(opaqueId, jti)
-            verify(jwtProvider, times(1)).createAccessToken(any(), any(), any())
+            verify(jwtProvider, times(1)).createAccessToken(any(), any())
             verify(jwtProvider, times(1)).createRefreshToken(any(), any())
             verify(refreshTokenRepository, times(1)).softDeleteByOpaqueIdAndJti(any(), any(), any())
             verify(refreshTokenRepository, times(1)).save(any<RefreshTokenEntity>())
@@ -215,7 +219,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
             whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(refreshTokenEntity)
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn("new-access-token")
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("new-access-token")
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("new-refresh-token")
             whenever(jwtProvider.getJti("new-refresh-token")).thenReturn("new-jti")
 
@@ -243,7 +247,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
             whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(refreshTokenEntity)
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn("new-access-token")
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("new-access-token")
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("new-refresh-token")
             whenever(jwtProvider.getJti("new-refresh-token")).thenReturn("new-jti")
             
@@ -274,7 +278,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
             whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(refreshTokenEntity)
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(newAccessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(newAccessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(newRefreshToken)
             whenever(jwtProvider.getJti(newRefreshToken)).thenReturn(newJti)
             
@@ -314,7 +318,7 @@ class AuthServiceTest : DescribeSpec({
         whenever(mockAuthProvider.member).thenReturn(mockMember)
 
         whenever(authProviderRepository.findByEmailAndProviderType(email,ProviderType.EMAIL)).thenReturn(mockAuthProvider)
-        whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(accessToken)
+        whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(accessToken)
         whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(refreshToken)
         whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
         
@@ -330,7 +334,7 @@ class AuthServiceTest : DescribeSpec({
         
 
         verify(authProviderRepository).findByEmailAndProviderType(email, ProviderType.EMAIL)
-        verify(jwtProvider).createAccessToken(any(), any(), any())
+        verify(jwtProvider).createAccessToken(any(), any())
         verify(jwtProvider).createRefreshToken(any(), any())
         verify(refreshTokenRepository).save(any<RefreshTokenEntity>())
     }
@@ -353,7 +357,7 @@ class AuthServiceTest : DescribeSpec({
 
         whenever(authProviderRepository.findByEmailAndProviderType(email,ProviderType.EMAIL)).thenReturn(mockAuthProvider)
         whenever(refreshTokenRepository.findActiveByMemberAndDeviceId(mockMember, deviceId)).thenReturn(existingRefreshToken)
-        whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn("access-token")
+        whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("access-token")
         whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("refresh-token")
         whenever(jwtProvider.getJti("refresh-token")).thenReturn("jti")
 
@@ -388,7 +392,7 @@ class AuthServiceTest : DescribeSpec({
         whenever(memberRepository.existsByNickname(nickname)).thenReturn(false)
         whenever(memberRepository.save(any<MemberEntity>())).thenReturn(mockMember)
         whenever(authProviderRepository.save(any<AuthProviderEntity>())).thenReturn(mock())
-        whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(accessToken)
+        whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(accessToken)
         whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(refreshToken)
         whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
         
@@ -433,7 +437,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(memberRepository.existsByNickname(nickname)).thenReturn(false)
             whenever(memberRepository.save(any<MemberEntity>())).thenReturn(mockMember)
             whenever(authProviderRepository.save(any<AuthProviderEntity>())).thenReturn(mock())
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(accessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(accessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(refreshToken)
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             
@@ -452,7 +456,7 @@ class AuthServiceTest : DescribeSpec({
             verify(memberRepository).existsByNickname(nickname)
             verify(memberRepository).save(any<MemberEntity>())
             verify(authProviderRepository).save(any<AuthProviderEntity>())
-            verify(jwtProvider).createAccessToken(any(), any(), any())
+            verify(jwtProvider).createAccessToken(any(), any())
             verify(jwtProvider).createRefreshToken(any(), any())
         }
 
@@ -478,7 +482,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(memberRepository.existsByNickname(nickname)).thenReturn(false)
             whenever(memberRepository.save(any<MemberEntity>())).thenReturn(mockMember)
             whenever(authProviderRepository.save(any<AuthProviderEntity>())).thenReturn(mock())
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(accessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(accessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(refreshToken)
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             
@@ -497,7 +501,7 @@ class AuthServiceTest : DescribeSpec({
             verify(memberRepository).existsByNickname(nickname)
             verify(memberRepository).save(any<MemberEntity>())
             verify(authProviderRepository).save(any<AuthProviderEntity>())
-            verify(jwtProvider).createAccessToken(any(), any(), any())
+            verify(jwtProvider).createAccessToken(any(), any())
             verify(jwtProvider).createRefreshToken(any(), any())
         }
 
@@ -526,7 +530,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(memberRepository.existsByNickname(uniqueNickname)).thenReturn(false)
             whenever(memberRepository.save(any<MemberEntity>())).thenReturn(mockMember)
             whenever(authProviderRepository.save(any<AuthProviderEntity>())).thenReturn(mock())
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(accessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(accessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(refreshToken)
             whenever(jwtProvider.getJti(refreshToken)).thenReturn("jti")
             
@@ -564,7 +568,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(memberRepository.existsByNickname(uniqueNickname)).thenReturn(false)
             whenever(memberRepository.save(any<MemberEntity>())).thenReturn(mockMember)
             whenever(authProviderRepository.save(any<AuthProviderEntity>())).thenReturn(mock())
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn("token")
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("token")
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("refresh")
             whenever(jwtProvider.getJti("refresh")).thenReturn("jti")
             
@@ -614,7 +618,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(memberRepository.existsByNickname(nickname)).thenReturn(false)
             whenever(memberRepository.save(memberCaptor.capture())).thenAnswer { mockMember }
             whenever(authProviderRepository.save(providerCaptor.capture())).thenAnswer { it.arguments[0] as AuthProviderEntity }
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn("token")
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("token")
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("refresh")
             whenever(jwtProvider.getJti("refresh")).thenReturn("jti")
             
@@ -717,7 +721,7 @@ class AuthServiceTest : DescribeSpec({
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
             whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(refreshTokenEntity)
-            whenever(jwtProvider.createAccessToken(any(), any(), any())).thenReturn(newAccessToken)
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn(newAccessToken)
             whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn(newRefreshToken)
             whenever(jwtProvider.getJti(newRefreshToken)).thenReturn(newJti)
             
@@ -736,7 +740,7 @@ class AuthServiceTest : DescribeSpec({
             verify(jwtProvider, times(1)).getJti(refreshToken)
             verify(jwtProvider, times(1)).getOpaqueId(refreshToken)
             verify(refreshTokenRepository, times(1)).findActiveByOpaqueIdAndJti(opaqueId, jti)
-            verify(jwtProvider, times(1)).createAccessToken(any(), any(), any())
+            verify(jwtProvider, times(1)).createAccessToken(any(), any())
             verify(jwtProvider, times(1)).createRefreshToken(any(), any())
             verify(refreshTokenRepository, times(1)).softDeleteByOpaqueIdAndJti(any(), any(), any())
             verify(refreshTokenRepository, times(1)).save(any<RefreshTokenEntity>())
