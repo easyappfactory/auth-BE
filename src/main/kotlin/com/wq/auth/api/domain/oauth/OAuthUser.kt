@@ -14,6 +14,7 @@ data class OAuthUser(
     val verifiedEmail: Boolean,
     val name: String?,
     val givenName: String? = null,
+    val phoneNumber: String? = null,
     val providerType: ProviderType
 ) {
     /**

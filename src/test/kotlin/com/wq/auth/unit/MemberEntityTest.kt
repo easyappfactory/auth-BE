@@ -1,7 +1,6 @@
 package com.wq.auth.unit
 
 import com.wq.auth.api.domain.member.entity.MemberEntity
-import com.wq.auth.api.domain.member.entity.Role
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -13,13 +12,11 @@ class MemberEntityTest : StringSpec({
     "MemberEntity.create()를 통해 정상적으로 생성된다" {
         // Given & When
         val member = MemberEntity.create(
-            nickname = "테스트사용자",
-            role = Role.MEMBER
+            nickname = "테스트사용자"
         )
 
         // Then
         member.nickname shouldBe "테스트사용자"
-        member.role shouldBe Role.MEMBER
         member.opaqueId shouldNotBe null
         UUID.fromString(member.opaqueId) // UUID 형식 검증
         member.isEmailVerified shouldBe false
@@ -62,17 +59,33 @@ class MemberEntityTest : StringSpec({
         member.isEmailVerified shouldBe true
     }
 
-    "관리자 권한 확인이 정상 작동한다" {
+    "전화번호 업데이트가 정상 작동한다" {
         // Given
-        val adminMember = MemberEntity.create(nickname = "관리자", role = Role.ADMIN)
-        val regularMember = MemberEntity.create(nickname = "일반사용자", role = Role.MEMBER)
+        val member = MemberEntity.createSocialMember(
+            nickname = "테스트",
+            primaryEmail = "test@naver.com",
+            phoneNumber = "01011112222"
+        )
 
-        // When & Then
-        adminMember.isAdmin() shouldBe true
-        regularMember.isAdmin() shouldBe false
+        // When
+        member.updatePhoneNumber("01012345678")
+
+        // Then
+        member.phoneNumber shouldBe "01012345678"
     }
 
-    /* 
+    "createSocialMember는 phoneNumber 없이도 생성된다" {
+        // Given & When
+        val member = MemberEntity.createSocialMember(
+            nickname = "테스트",
+            primaryEmail = "test@naver.com"
+        )
+
+        // Then
+        member.phoneNumber shouldBe null
+    }
+
+    /*
     // 다음 코드는 컴파일 에러가 발생해야 함 (protected constructor)
     "외부에서 직접 생성자 호출 시도" {
         // 이 코드는 컴파일되지 않아야 함

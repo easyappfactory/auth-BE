@@ -33,6 +33,7 @@ class MemberServiceTest : DescribeSpec({
             val opaqueId = "validOpaqueId"
             val nickname = "testUser"
             val email = "test@email.com"
+            val phoneNumber = "01012345678"
 
             val mockMember = mock<MemberEntity>()
             val mockAuthProvider = mock<AuthProviderEntity>()
@@ -42,6 +43,7 @@ class MemberServiceTest : DescribeSpec({
             whenever(mockAuthProvider.member).thenReturn(mockMember)
             whenever(mockAuthProvider.providerType).thenReturn(ProviderType.EMAIL)
             whenever(mockMember.primaryEmail).thenReturn(email)
+            whenever(mockMember.phoneNumber).thenReturn(phoneNumber)
 
             whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(mockMember))
             whenever(authProviderRepository.findByMember(mockMember)).thenReturn(listOf(mockAuthProvider))
@@ -53,6 +55,7 @@ class MemberServiceTest : DescribeSpec({
             result.userId shouldBe opaqueId
             result.nickname shouldBe nickname
             result.email shouldBe email
+            result.phoneNumber shouldBe phoneNumber
 
             verify(memberRepository).findByOpaqueId(opaqueId)
             verify(authProviderRepository).findByMember(mockMember)

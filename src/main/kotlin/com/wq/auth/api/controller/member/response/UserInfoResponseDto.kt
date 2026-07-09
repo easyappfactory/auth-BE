@@ -7,5 +7,6 @@ data class UserInfoResponseDto(
     val userId: String,
     val nickname: String,
     val email: String,
+    val phoneNumber: String?,
     val linkedProviders: List<ProviderType>
 )
