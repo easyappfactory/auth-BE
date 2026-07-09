@@ -23,6 +23,7 @@ class MemberService(
         val userId: String,
         val nickname: String,
         val email: String,
+        val phoneNumber: String?,
         val providers: List<ProviderType>,
     )
 
@@ -65,6 +66,7 @@ class MemberService(
             userId = member.opaqueId,
             nickname = member.nickname,
             email = email!!,
+            phoneNumber = member.phoneNumber,
             providers = providers
         )
     }

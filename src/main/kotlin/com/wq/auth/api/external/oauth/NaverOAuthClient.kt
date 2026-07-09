@@ -160,6 +160,7 @@ class NaverOAuthClient(
             verifiedEmail = naverUserInfo.response.email != null,
             name = naverUserInfo.response.name,
             givenName = naverUserInfo.response.nickname, // 네이버는 givenName이 없으므로 nickname 사용
+            phoneNumber = naverUserInfo.response.getNormalizedMobile(),
             providerType = ProviderType.NAVER
         )
     }

@@ -70,4 +70,12 @@ data class NaverUserInfo(
      * Naver 제공자 ID를 반환합니다.
      */
     fun getProviderId(): String = id
+
+    /**
+     * mobile 값을 숫자만 남긴 형태로 정규화하여 반환합니다. (예: "010-1234-5678" -> "01012345678")
+     */
+    fun getNormalizedMobile(): String? {
+        val digits = mobile?.filter { it.isDigit() }
+        return if (digits.isNullOrBlank()) null else digits
+    }
 }
