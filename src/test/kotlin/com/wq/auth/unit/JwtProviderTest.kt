@@ -1,6 +1,5 @@
 package com.wq.auth.unit
 
-import com.wq.auth.api.domain.member.entity.Role
 import com.wq.auth.security.jwt.JwtProperties
 import com.wq.auth.security.jwt.JwtProvider
 import com.wq.auth.security.jwt.error.JwtException
@@ -33,15 +32,14 @@ class JwtProviderTest : StringSpec({
 
     "간소화된 AccessToken을 발급하면 opaqueId 파싱이 정상 동작한다" {
         val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
-        val token = provider.createAccessToken(opaqueId, Role.MEMBER)
+        val token = provider.createAccessToken(opaqueId)
         provider.getOpaqueId(token) shouldBe opaqueId
-        provider.getRole(token) shouldBe Role.MEMBER
     }
 
-    "간소화된 AccessToken에 role claim이 실제로 들어간다" {
+    "AccessToken에 extraClaims가 실제로 들어간다" {
         val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
-        val token = provider.createAccessToken(opaqueId, Role.ADMIN)
-        
+        val token = provider.createAccessToken(opaqueId, mapOf("role" to "ADMIN"))
+
         val key: SecretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(props.secret))
         val claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload
         claims["role"] shouldBe "ADMIN"
@@ -54,7 +52,7 @@ class JwtProviderTest : StringSpec({
         val providerWithAnotherKey = JwtProvider(
             JwtProperties(secret = keyB, accessExp = Duration.ofMinutes(5), refreshExp = Duration.ofDays(14))
         )
-        val tokenSignedByB = providerWithAnotherKey.createAccessToken("550e8400-e29b-41d4-a716-446655440000", Role.MEMBER)
+        val tokenSignedByB = providerWithAnotherKey.createAccessToken("550e8400-e29b-41d4-a716-446655440000")
 
         val ex = shouldThrow<JwtException> {
             provider.validateOrThrow(tokenSignedByB)
@@ -71,7 +69,7 @@ class JwtProviderTest : StringSpec({
         )
         val shortExpProvider = JwtProvider(shortExpProps)
         
-        val token = shortExpProvider.createAccessToken("550e8400-e29b-41d4-a716-446655440000", Role.MEMBER)
+        val token = shortExpProvider.createAccessToken("550e8400-e29b-41d4-a716-446655440000")
         Thread.sleep(200) // 100ms 대기
         val ex = shouldThrow<JwtException> { shortExpProvider.validateOrThrow(token) }
         ex.jwtCode shouldBe JwtExceptionCode.EXPIRED
@@ -117,8 +115,8 @@ class JwtProviderTest : StringSpec({
 
     "토큰 생성 시 올바른 구조와 클레임이 포함된다" {
         val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
-        val role = Role.ADMIN
-        val token = provider.createAccessToken(opaqueId, role)
+        val roleName = "ADMIN"
+        val token = provider.createAccessToken(opaqueId, mapOf("role" to roleName))
         
         // 토큰 구조 검증 (3개 세그먼트)
         val segments = token.split(".")
@@ -129,13 +127,13 @@ class JwtProviderTest : StringSpec({
         val claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload
         
         claims.subject shouldBe opaqueId
-        claims["role"] shouldBe role.name
+        claims["role"] shouldBe roleName
         claims.issuedAt shouldNotBe null
         claims.expiration shouldNotBe null
     }
 
     "토큰 유효성 검증이 정상 동작한다" {
-        val validToken = provider.createAccessToken("test-user", Role.MEMBER)
+        val validToken = provider.createAccessToken("test-user")
         
         // 예외 없이 통과해야 함
         provider.validateOrThrow(validToken)

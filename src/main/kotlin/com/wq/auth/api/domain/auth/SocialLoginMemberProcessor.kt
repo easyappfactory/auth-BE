@@ -56,17 +56,32 @@ class SocialLoginMemberProcessor(
             providerType
         )?.let { existingAuthProvider ->
             log.info { "기존 회원 발견: ${existingAuthProvider.member.opaqueId}" }
-            Pair(existingAuthProvider.member, false)
+            val existingMember = existingAuthProvider.member
+            updatePhoneNumberIfChanged(existingMember, oauthUser)
+            Pair(existingMember, false)
         } ?: run {
             log.info { "신규 회원 생성: ${oauthUser.email}" }
             val newMember = MemberEntity.createSocialMember(
                 nickname = oauthUser.getNickname(),
                 isEmailVerified = oauthUser.verifiedEmail,
-                primaryEmail = oauthUser.email
+                primaryEmail = oauthUser.email,
+                phoneNumber = oauthUser.phoneNumber
             )
             val savedMember = memberRepository.save(newMember)
             log.info { "신규 회원 생성 완료: ${savedMember.opaqueId}" }
             Pair(savedMember, true)
+        }
+    }
+
+    /**
+     * 소셜 제공자가 전달한 전화번호가 있으면 항상 최신 값으로 갱신합니다.
+     */
+    private fun updatePhoneNumberIfChanged(member: MemberEntity, oauthUser: OAuthUser) {
+        val phoneNumber = oauthUser.phoneNumber
+        if (!phoneNumber.isNullOrBlank() && member.phoneNumber != phoneNumber) {
+            member.updatePhoneNumber(phoneNumber)
+            memberRepository.save(member)
+            log.info { "회원 전화번호 갱신 완료: ${member.opaqueId}" }
         }
     }
 

@@ -7,11 +7,9 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestHeader
-import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/internal-api/v1/members")
 class InternalMemberController(
     private val memberService: MemberService,
     @Value("\${app.internal.secret}") private val internalSecret: String,
@@ -21,7 +19,7 @@ class InternalMemberController(
         private val log = LoggerFactory.getLogger(InternalMemberController::class.java)
     }
 
-    @GetMapping("/{userId}")
+    @GetMapping("/internal-api/v1/members/{userId}")
     fun getUserInfo(
         @PathVariable userId: String,
         @RequestHeader("X-Internal-Secret") secret: String,
@@ -37,6 +35,7 @@ class InternalMemberController(
             userId = userInfo.userId,
             email = userInfo.email,
             nickname = userInfo.nickname,
+            phoneNumber = userInfo.phoneNumber,
         ))
     }
 
@@ -44,5 +43,6 @@ class InternalMemberController(
         val userId: String,
         val email: String,
         val nickname: String,
+        val phoneNumber: String?,
     )
 }

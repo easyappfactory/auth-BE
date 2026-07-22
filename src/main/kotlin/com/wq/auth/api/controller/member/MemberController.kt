@@ -55,6 +55,7 @@ class MemberController(
             userId = result.userId,
             nickname = result.nickname,
             email = result.email,
+            phoneNumber = result.phoneNumber,
             linkedProviders = result.providers
         )
         return CommonResponse.success(message = "회원 정보 조회 성공", data = resp)

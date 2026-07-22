@@ -21,7 +21,7 @@ open class MemberEntity protected constructor(
     val primaryEmail: String? = null,
 
     @Column(name = "phone_number", length = 20, nullable = true)
-    val phoneNumber: String? = null,
+    var phoneNumber: String? = null,
 
     @Column(name = "opaque_id", nullable = false, unique = true, length = 36)
     val opaqueId: String,
@@ -69,6 +69,7 @@ open class MemberEntity protected constructor(
             nickname: String,
             isEmailVerified: Boolean = true,
             primaryEmail: String,
+            phoneNumber: String? = null,
         ): MemberEntity {
             require(nickname.isNotBlank()) { "닉네임은 필수입니다" }
             require(nickname.length <= 100) { "닉네임은 100자를 초과할 수 없습니다" }
@@ -77,7 +78,8 @@ open class MemberEntity protected constructor(
                 opaqueId = UuidCreator.getTimeOrdered().toString(),
                 nickname = nickname.trim(),
                 isEmailVerified = isEmailVerified,
-                primaryEmail = primaryEmail
+                primaryEmail = primaryEmail,
+                phoneNumber = phoneNumber
             )
         }
     }
@@ -87,6 +89,13 @@ open class MemberEntity protected constructor(
      */
     fun verifyEmail() {
         this.isEmailVerified = true
+    }
+
+    /**
+     * 전화번호 업데이트
+     */
+    fun updatePhoneNumber(phoneNumber: String) {
+        this.phoneNumber = phoneNumber
     }
 
     /**
