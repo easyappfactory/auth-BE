@@ -2,7 +2,7 @@ name: Deploy (auth-api)
 
 # ---------------------------------------------------------------------------
 # EC2 원격 경로 (아래 deploy job 의 env.PROJECT_ROOT 만 수정)
-#   PROJECT_ROOT … 배포 기준 루트.
+#   PROJECT_ROOT … 배포 기준 루트. 예: ~, ~/myapp (끝 슬래시 없음)
 #   환경변수 파일은 항상 {PROJECT_ROOT}/env/ 아래 (이름 고정: env)
 #   배포는 EC2의 PROJECT_ROOT 에서 docker compose (서비스명: auth-api, V2 기준)
 # ---------------------------------------------------------------------------
@@ -39,7 +39,6 @@ jobs:
     environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'alpha' }}
     env:
       PROJECT_ROOT: '~/apps'
-      SPRING_APP_NAME: 'auth-api'
 
     steps:
       - name: Checkout
@@ -96,9 +95,9 @@ jobs:
 
       - name: Create env file and copy to EC2
         run: |
-          printf '%s\n' "${{ secrets.AUTH_BE_ENV_FILE }}" > ${{ env.SPRING_APP_NAME }}.env
+          printf '%s\n' "${{ secrets.AUTH_BE_ENV_FILE }}" > auth-api.env
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ${{ env.PROJECT_ROOT }}/env'
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ env.SPRING_APP_NAME }}.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ env.PROJECT_ROOT }}/env/${{ env.SPRING_APP_NAME }}.env
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem auth-api.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ env.PROJECT_ROOT }}/env/auth-api.env
 
       - name: Deploy to EC2
         run: |
@@ -110,9 +109,9 @@ jobs:
           export SPRING_PROFILES_ACTIVE="${{ env.SPRING_PROFILE }}"
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
           cd ${{ env.PROJECT_ROOT }}
-          docker compose stop ${{ env.SPRING_APP_NAME }} || true
-          docker compose rm -f ${{ env.SPRING_APP_NAME }} || true
-          docker compose pull ${{ env.SPRING_APP_NAME }}
-          docker compose up -d --no-deps --force-recreate ${{ env.SPRING_APP_NAME }}
+          docker compose stop auth-api || true
+          docker compose rm -f auth-api || true
+          docker compose pull auth-api
+          docker compose up -d --no-deps --force-recreate auth-api
           docker logout
           '
