@@ -1,18 +1,23 @@
 package com.wq.auth.api.domain.member
 
 import com.wq.auth.api.domain.auth.AuthProviderRepository
+import com.wq.auth.api.domain.auth.RefreshTokenRepository
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.member.entity.MemberEntity
+import com.wq.auth.api.domain.member.entity.MemberWithdrawalAuditEntity
 import com.wq.auth.api.domain.member.error.MemberException
 import com.wq.auth.api.domain.member.error.MemberExceptionCode
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Service
 class MemberService(
     private val memberRepository: MemberRepository,
     private val authProviderRepository: AuthProviderRepository,
+    private val refreshTokenRepository: RefreshTokenRepository,
+    private val memberWithdrawalAuditRepository: MemberWithdrawalAuditRepository,
     ) {
 
     companion object {
@@ -77,7 +82,28 @@ class MemberService(
 
     fun create(member: MemberEntity): MemberEntity = memberRepository.save(member)
 
-    fun delete(id: Long) = memberRepository.deleteById(id)
+    @Transactional
+    fun withdraw(opaqueId: String, sourceClient: String?) {
+        val member = memberRepository.findByOpaqueId(opaqueId).orElse(null)
+        if (member == null) {
+            log.warn("[MemberService] 이미 탈퇴한 회원 - opaqueId={}", opaqueId)
+            return
+        }
+
+        memberWithdrawalAuditRepository.save(
+            MemberWithdrawalAuditEntity(
+                opaqueId = opaqueId,
+                withdrawnAt = Instant.now(),
+                sourceClient = sourceClient,
+            )
+        )
+
+        refreshTokenRepository.deleteByMember(member)
+        authProviderRepository.deleteByMember(member)
+        memberRepository.delete(member)
+
+        log.info("[MemberService] 회원 탈퇴 완료 - opaqueId={}, sourceClient={}", opaqueId, sourceClient)
+    }
 
     fun updateNickname(id: Long, newNickname: String): MemberEntity? {
         val member = memberRepository.findById(id).orElse(null)

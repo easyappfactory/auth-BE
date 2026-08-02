@@ -30,4 +30,8 @@ interface RefreshTokenRepository : JpaRepository<RefreshTokenEntity, Long> {
     @Query("SELECT r FROM RefreshTokenEntity r WHERE r.member = :member AND r.deviceId = :deviceId AND r.deletedAt IS NULL")
     fun findActiveByMemberAndDeviceId(@Param("member") member: MemberEntity, @Param("deviceId") deviceId: String?): RefreshTokenEntity?
 
+    @Modifying
+    @Transactional
+    fun deleteByMember(member: MemberEntity)
+
 }
