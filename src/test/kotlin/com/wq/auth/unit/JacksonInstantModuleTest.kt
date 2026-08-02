@@ -1,21 +1,25 @@
 package com.wq.auth.unit
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.wq.auth.shared.time.ZoneProvider
 import io.kotest.core.spec.style.StringSpec
 import java.time.Instant
 import java.time.ZoneId
-import com.fasterxml.jackson.databind.module.SimpleModule
+import tools.jackson.databind.module.SimpleModule
+import tools.jackson.databind.json.JsonMapper
 import com.wq.auth.shared.time.InstantFromIsoDeserializer
 import com.wq.auth.shared.time.InstantToZoneSerializer
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 
+/**
+ * InstantToZoneSerializer / InstantFromIsoDeserializer 단위 테스트.
+ *
+ * Spring Boot 4는 Jackson 3.x(tools.jackson.*)를 사용하므로 JsonMapper와
+ * tools.jackson.databind.module.SimpleModule을 직접 사용합니다.
+ */
 class JacksonInstantModuleTest : StringSpec({
 
-    fun mapperWith(zoneId: String): ObjectMapper {
+    fun mapperWith(zoneId: String): JsonMapper {
         val zoneProvider = object : ZoneProvider {
             override fun zoneId(): ZoneId = ZoneId.of(zoneId)
         }
@@ -23,10 +27,9 @@ class JacksonInstantModuleTest : StringSpec({
             addSerializer(Instant::class.java, InstantToZoneSerializer(zoneProvider))
             addDeserializer(Instant::class.java, InstantFromIsoDeserializer())
         }
-        return ObjectMapper()
-            .registerModule(JavaTimeModule())
-            .registerModule(module)
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        return JsonMapper.builder()
+            .addModule(module)
+            .build()
     }
 
     "Instant → JSON 직렬화 시 Asia/Seoul(+09:00)로 변환된다" {

@@ -71,7 +71,11 @@ dependencies {
 	testImplementation("io.kotest:kotest-assertions-core:$kotestVersion")
 	testImplementation("io.kotest:kotest-assertions-json:$kotestVersion")
 	testImplementation("io.kotest:kotest-property:$kotestVersion")
-	testImplementation("io.kotest.extensions:kotest-extensions-spring:1.1.3")
+	// kotest 6.x용 Spring 확장(메인 io.kotest 그룹, kotest 버전과 정렬)
+	testImplementation("io.kotest:kotest-extensions-spring:$kotestVersion")
+
+	// Spring Boot 4: WebMvcTest / AutoConfigureMockMvc 는 별도 모듈로 분리
+	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
 
 	// Mockito-Kotlin
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")

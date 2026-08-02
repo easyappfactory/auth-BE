@@ -45,7 +45,7 @@ springdoc:
   api-docs:
     enabled: true
   swagger-ui:
-    path: ${SWAGGER_PATH}
+    path: ${SWAGGER_PATH:/swagger-ui.html}
 
 app:
   time:
