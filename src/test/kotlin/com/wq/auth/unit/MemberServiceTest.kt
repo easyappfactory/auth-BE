@@ -23,7 +23,7 @@ class MemberServiceTest : DescribeSpec({
     beforeEach {
         memberRepository = mock<MemberRepository>()
         authProviderRepository = mock<AuthProviderRepository>()
-        memberService = MemberService(memberRepository, authProviderRepository)
+        memberService = MemberService(memberRepository, authProviderRepository, mock(), mock())
     }
 
     describe("사용자 정보 조회 테스트") {

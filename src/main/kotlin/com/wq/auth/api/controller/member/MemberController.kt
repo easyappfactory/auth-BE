@@ -5,6 +5,7 @@ import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.member.MemberService
 import com.wq.auth.security.annotation.AuthenticatedApi
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.config.CookieFactory
 import com.wq.auth.shared.rateLimiter.annotation.RateLimit
 import com.wq.auth.web.common.response.CommonResponse
 import io.swagger.v3.oas.annotations.Operation
@@ -13,6 +14,8 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpHeaders
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import java.util.concurrent.TimeUnit
@@ -21,6 +24,7 @@ import java.util.concurrent.TimeUnit
 @RestController
 class MemberController(
     private val memberService: MemberService,
+    private val cookieFactory: CookieFactory,
 ) {
 
     @Operation(
@@ -73,10 +77,38 @@ class MemberController(
     fun create(@RequestBody member: MemberEntity): CommonResponse<MemberEntity> =
         CommonResponse.success("회원 생성 성공", memberService.create(member))
 
-    @DeleteMapping("/api/v1/members/{id}")
-    fun delete(@PathVariable id: Long): CommonResponse<Void> {
-        memberService.delete(id)
-        return CommonResponse.success("회원 삭제 성공")
+    @Operation(
+        summary = "회원 탈퇴",
+        description = "인증된 본인 계정을 즉시 하드 삭제합니다. 소셜 연동 정보 및 리프레시 토큰도 함께 삭제됩니다."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "회원 탈퇴 성공",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "인증 실패 또는 로그인 필요",
+                content = [Content(schema = Schema(implementation = CommonResponse::class))]
+            )
+        ]
+    )
+    @RateLimit(limit = 5, duration = 1, timeUnit = TimeUnit.MINUTES)
+    @DeleteMapping("/api/v1/auth/members/me")
+    @AuthenticatedApi
+    fun withdraw(
+        @AuthenticationPrincipal principalDetail: PrincipalDetails,
+        @RequestHeader("X-Client-Type") clientType: String,
+        response: HttpServletResponse,
+    ): CommonResponse<Void> {
+        memberService.withdraw(principalDetail.opaqueId, clientType)
+        if (clientType == "web") {
+            response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.expireAccessTokenCookie().toString())
+            response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.expireRefreshTokenCookie().toString())
+        }
+        return CommonResponse.success("회원 탈퇴 성공")
     }
 
     @PutMapping("/api/v1/members/{id}/nickname")

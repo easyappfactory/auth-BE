@@ -45,7 +45,7 @@ springdoc:
   api-docs:
     enabled: true
   swagger-ui:
-    path: ${SWAGGER_PATH}
+    path: ${SWAGGER_PATH:/swagger-ui.html}
 
 app:
   time:
@@ -54,6 +54,18 @@ app:
     domain: ${APP_COOKIE_DOMAIN:localhost}
   internal:
     secret: ${INTERNAL_API_SECRET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
 
 project:
   logging:

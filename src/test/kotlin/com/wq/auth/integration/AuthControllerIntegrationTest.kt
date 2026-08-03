@@ -3,27 +3,31 @@ package com.wq.auth.integration
 import com.wq.auth.api.controller.auth.AuthController
 import com.wq.auth.api.domain.email.AuthEmailService
 import com.wq.auth.api.domain.auth.AuthService
+import com.wq.auth.api.domain.member.MemberService
 import com.wq.auth.security.jwt.JwtProperties
 import com.wq.auth.security.jwt.JwtProvider
 import com.wq.auth.security.jwt.error.JwtException
 import com.wq.auth.security.jwt.error.JwtExceptionCode
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.config.CookieFactory
 import io.kotest.core.spec.style.DescribeSpec
-import io.kotest.extensions.spring.SpringTestExtension
+import io.kotest.extensions.spring.SpringExtension
 import org.mockito.BDDMockito.given
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseCookie
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import jakarta.servlet.http.Cookie
 import org.hamcrest.Matchers
+import org.hamcrest.Matchers.hasItem
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import java.time.Duration
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import com.wq.auth.api.domain.member.entity.Role
 import com.wq.auth.shared.rateLimiter.RateLimiterInterceptor
 import org.mockito.Mockito.*
 import org.mockito.kotlin.whenever
@@ -32,9 +36,10 @@ import org.mockito.kotlin.any
 @WebMvcTest(
     controllers = [AuthController::class],
     properties = ["app.cookie.same-site=Strict"])
+@Import(WebMvcTestSecurityConfig::class)
 class AuthControllerIntegrationTest : DescribeSpec() {
 
-    override fun extensions() = listOf(SpringTestExtension())
+    override val extensions = listOf(SpringExtension())
 
     @Autowired
     lateinit var mockMvc: MockMvc
@@ -44,6 +49,12 @@ class AuthControllerIntegrationTest : DescribeSpec() {
 
     @MockitoBean
     lateinit var authEmailService: AuthEmailService
+
+    @MockitoBean
+    lateinit var memberService: MemberService
+
+    @MockitoBean
+    lateinit var cookieFactory: CookieFactory
 
     @MockitoBean
     lateinit var jwtProperties: JwtProperties
@@ -65,15 +76,31 @@ class AuthControllerIntegrationTest : DescribeSpec() {
             // validateOrThrow는 void이므로 doNothing 사용
             doNothing().whenever(jwtProvider).validateOrThrow(any())
 
-            // getOpaqueId와 getRole Mock 설정
+            // getOpaqueId Mock 설정
             whenever(jwtProvider.getOpaqueId(any())).thenReturn("opaqueId")
-            whenever(jwtProvider.getRole(any())).thenReturn(Role.MEMBER)
+
+            // CookieFactory 기본 스텁 설정 (NPE 방지)
+            whenever(cookieFactory.createAccessTokenCookie(any())).thenAnswer { invocation ->
+                val token = invocation.arguments[0] as String
+                ResponseCookie.from("accessToken", token)
+                    .httpOnly(true).path("/").sameSite("Strict").build()
+            }
+            whenever(cookieFactory.createRefreshTokenCookie(any())).thenAnswer { invocation ->
+                val token = invocation.arguments[0] as String
+                ResponseCookie.from("refreshToken", token)
+                    .httpOnly(true).path("/").sameSite("Strict").build()
+            }
+            whenever(cookieFactory.expireAccessTokenCookie()).thenReturn(
+                ResponseCookie.from("accessToken", "").maxAge(0).path("/").sameSite("Strict").build()
+            )
+            whenever(cookieFactory.expireRefreshTokenCookie()).thenReturn(
+                ResponseCookie.from("refreshToken", "").maxAge(0).path("/").sameSite("Strict").build()
+            )
         }
 
         describe("POST /api/v1/auth/members/refresh") {
             val principal = PrincipalDetails(
-                opaqueId = "opaqueId",
-                role = Role.MEMBER
+                opaqueId = "opaqueId"
             )
 
             context("Web 클라이언트에서 유효한 요청이 주어졌을 때") {
@@ -112,15 +139,25 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                         .andExpect(status().isOk)
                         .andExpect(jsonPath("$.success").value(true))
                         .andExpect(jsonPath("$.message").value("AccessToken 재발급에 성공했습니다."))
-                        // web 응답은 data null, 헤더만 검증
+                        // web 응답: Set-Cookie 헤더가 여러 개(accessToken, refreshToken) 존재하므로 stringValues로 검증
                         .andExpect(
-                            header().string(
+                            header().stringValues(
                                 "Set-Cookie",
-                                Matchers.containsString("refreshToken=$newRefreshToken")
+                                hasItem(Matchers.containsString("refreshToken=$newRefreshToken"))
                             )
                         )
-                        .andExpect(header().string("Set-Cookie", Matchers.containsString("HttpOnly")))
-                        .andExpect(header().string("Set-Cookie", Matchers.containsString("SameSite=Strict")))
+                        .andExpect(
+                            header().stringValues(
+                                "Set-Cookie",
+                                hasItem(Matchers.containsString("HttpOnly"))
+                            )
+                        )
+                        .andExpect(
+                            header().stringValues(
+                                "Set-Cookie",
+                                hasItem(Matchers.containsString("SameSite=Strict"))
+                            )
+                        )
 
                     verify(authService).refreshAccessToken(refreshToken, deviceId)
                 }
@@ -251,11 +288,11 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                         .andExpect(status().isOk)
                         .andExpect(jsonPath("$.success").value(true))
                         .andExpect(jsonPath("$.message").value("로그인에 성공했습니다."))
-                        .andExpect(header().string("Authorization", Matchers.containsString("Bearer ")))
+                        // web 응답: Set-Cookie 헤더가 여러 개이므로 stringValues로 검증
                         .andExpect(
-                            header().string(
+                            header().stringValues(
                                 "Set-Cookie",
-                                Matchers.containsString("refreshToken=$refreshToken")
+                                hasItem(Matchers.containsString("refreshToken=$refreshToken"))
                             )
                         )
 
@@ -312,8 +349,7 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                     val refreshToken = "valid-refresh-token"
                     val clientType = "web"
                     val principal = PrincipalDetails(
-                        opaqueId = "opaqueId",
-                        role = Role.MEMBER
+                        opaqueId = "opaqueId"
                     )
                     val requestBody = """{}"""
 
@@ -330,14 +366,21 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                         .andExpect(status().isOk)
                         .andExpect(jsonPath("$.success").value(true))
                         .andExpect(jsonPath("$.message").value("로그아웃에 성공했습니다."))
-                        .andExpect(jsonPath("$.data").isEmpty)
+                        // data가 null이면 @JsonInclude(NON_NULL)에 의해 JSON에 포함되지 않음
+                        .andExpect(jsonPath("$.data").doesNotExist())
+                        // web 응답: Set-Cookie 헤더가 여러 개이므로 stringValues로 검증
                         .andExpect(
-                            header().string(
+                            header().stringValues(
                                 "Set-Cookie",
-                                Matchers.containsString("refreshToken=")
+                                hasItem(Matchers.containsString("refreshToken="))
                             )
                         )
-                        .andExpect(header().string("Set-Cookie", Matchers.containsString("Max-Age=0")))
+                        .andExpect(
+                            header().stringValues(
+                                "Set-Cookie",
+                                hasItem(Matchers.containsString("Max-Age=0"))
+                            )
+                        )
 
                     verify(authService).logout(refreshToken)
                 }
@@ -349,8 +392,7 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                     val refreshToken = "valid-refresh-token"
                     val clientType = "app"
                     val principal = PrincipalDetails(
-                        opaqueId = "opaqueId",
-                        role = Role.MEMBER
+                        opaqueId = "opaqueId"
                     )
 
                     val requestBody = """{"refreshToken": "$refreshToken"}"""
@@ -367,7 +409,8 @@ class AuthControllerIntegrationTest : DescribeSpec() {
                         .andExpect(status().isOk)
                         .andExpect(jsonPath("$.success").value(true))
                         .andExpect(jsonPath("$.message").value("로그아웃에 성공했습니다."))
-                        .andExpect(jsonPath("$.data").isEmpty)
+                        // data가 null이면 @JsonInclude(NON_NULL)에 의해 JSON에 포함되지 않음
+                        .andExpect(jsonPath("$.data").doesNotExist())
                         .andExpect(header().doesNotExist("Set-Cookie"))
 
                     verify(authService).logout(refreshToken)

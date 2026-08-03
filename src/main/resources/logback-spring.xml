@@ -3,13 +3,13 @@
     <springProperty scope="context" name="project.logging.env" source="project.logging.env" defaultValue="alpha"/>
     <include resource="base-logback.xml"/>
 
+    <!-- alpha/prod: JSON 파일 + stdout (Alloy 수집 대상) -->
     <springProfile name="alpha,prod">
         <root level="INFO">
             <appender-ref ref="JSON_STDOUT"/>
+            <appender-ref ref="JSON_FILE"/>
         </root>
-        <!-- 개발자 코드: trace 포함 전부 출력 -->
         <logger name="com.wq.auth" level="TRACE"/>
-        <!-- 프레임워크 노이즈 억제 -->
         <logger name="org.hibernate" level="WARN"/>
         <logger name="com.zaxxer.hikari" level="WARN"/>
         <logger name="org.springframework.boot.autoconfigure" level="WARN"/>
@@ -18,5 +18,17 @@
         <logger name="org.springframework.orm" level="WARN"/>
         <logger name="org.springframework.web" level="WARN"/>
         <logger name="org.springframework.security" level="WARN"/>
+    </springProfile>
+
+    <!-- local: 개발 편의를 위한 plain text 콘솔 -->
+    <springProfile name="local,default">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+        <root level="DEBUG">
+            <appender-ref ref="STDOUT"/>
+        </root>
     </springProfile>
 </configuration>
