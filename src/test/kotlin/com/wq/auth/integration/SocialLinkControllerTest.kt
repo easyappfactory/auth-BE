@@ -1,22 +1,23 @@
 package com.wq.auth.integration
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.json.JsonMapper
 import com.wq.auth.api.controller.auth.SocialLoginController
 import com.wq.auth.api.domain.auth.SocialLinkService
 import com.wq.auth.api.domain.auth.SocialLoginService
-import com.wq.auth.api.domain.member.entity.Role
 import com.wq.auth.api.domain.oauth.error.SocialLoginException
 import com.wq.auth.api.domain.oauth.error.SocialLoginExceptionCode
 import com.wq.auth.security.jwt.JwtProvider
 import com.wq.auth.security.principal.PrincipalDetails
+import com.wq.auth.shared.config.CookieFactory
 import com.wq.auth.shared.rateLimiter.RateLimiterInterceptor
 import io.kotest.core.spec.style.DescribeSpec
-import io.kotest.extensions.spring.SpringTestExtension
+import io.kotest.extensions.spring.SpringExtension
 import jakarta.servlet.http.Cookie
 import org.mockito.BDDMockito.given
 import org.mockito.kotlin.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -30,21 +31,25 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
  * 소셜 계정 연동 Controller 단위 테스트 (Kotest + Mockito)
  */
 @WebMvcTest(controllers = [SocialLoginController::class])
+@Import(WebMvcTestSecurityConfig::class)
 class SocialLinkControllerTest : DescribeSpec() {
 
-    override fun extensions() = listOf(SpringTestExtension())
+    override val extensions = listOf(SpringExtension())
 
     @Autowired
     lateinit var mockMvc: MockMvc
 
     @Autowired
-    lateinit var objectMapper: ObjectMapper
+    lateinit var objectMapper: JsonMapper
 
     @MockitoBean
     lateinit var socialLoginService: SocialLoginService
 
     @MockitoBean
     lateinit var socialLinkService: SocialLinkService
+
+    @MockitoBean
+    lateinit var cookieFactory: CookieFactory
 
     @MockitoBean
     lateinit var jwtProvider: JwtProvider
@@ -63,9 +68,8 @@ class SocialLinkControllerTest : DescribeSpec() {
             // validateOrThrow는 void이므로 doNothing 사용
             doNothing().whenever(jwtProvider).validateOrThrow(any())
 
-            // getOpaqueId와 getRole Mock 설정
+            // getOpaqueId Mock 설정
             whenever(jwtProvider.getOpaqueId(any())).thenReturn("opaqueId")
-            whenever(jwtProvider.getRole(any())).thenReturn(Role.MEMBER)
         }
 
         describe("POST /api/v1/auth/link/{provider}") {
@@ -76,8 +80,7 @@ class SocialLinkControllerTest : DescribeSpec() {
             val accessToken = "valid-access-token"
 
             val principal = PrincipalDetails(
-                opaqueId = "opaqueId",
-                role = Role.MEMBER
+                opaqueId = "opaqueId"
             )
 
             context("Google 계정 연동 - 신규 연동 성공") {

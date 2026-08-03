@@ -84,12 +84,11 @@ class AuthController(
             deviceId = req.deviceId,
         )
 
-        val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
-        val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(newRefreshToken)
-        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-
         if (clientType == "web") {
+            val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
+            val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(newRefreshToken)
+            response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+            response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
             return CommonResponse.success(message = "로그인에 성공했습니다.", data = null)
         }
 
@@ -276,12 +275,11 @@ class AuthController(
             currentRefreshToken, req?.deviceId
         )
 
-        val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
-        val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(newRefreshToken)
-        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-
         if (clientType == "web") {
+            val accessTokenCookie = cookieFactory.createAccessTokenCookie(accessToken)
+            val refreshTokenCookie = cookieFactory.createRefreshTokenCookie(newRefreshToken)
+            response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+            response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
             return CommonResponse.success(message = "AccessToken 재발급에 성공했습니다.", data = null)
         }
 

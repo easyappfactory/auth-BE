@@ -1,13 +1,14 @@
 package com.wq.auth.shared.time
 
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonSerializer
-import com.fasterxml.jackson.databind.SerializerProvider
-import com.fasterxml.jackson.databind.module.SimpleModule
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import tools.jackson.core.JsonGenerator
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.SerializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.ValueSerializer
+import tools.jackson.databind.module.SimpleModule
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -19,8 +20,8 @@ private val ISO_WITH_SECONDS: DateTimeFormatter =
 /** Instant -> ISO-8601(+offset)로 ZoneProvider 기준 변환 */
 class InstantToZoneSerializer(
     private val zoneProvider: ZoneProvider
-) : JsonSerializer<Instant>() { // Instant -> JSON 문자열로 변환하는 클래스
-    override fun serialize(value: Instant?, gen: JsonGenerator, serializers: SerializerProvider) {
+) : ValueSerializer<Instant>() {
+    override fun serialize(value: Instant?, gen: JsonGenerator, ctxt: SerializationContext) {
         if (value == null) { gen.writeNull(); return }
         val offset = value
             .atZone(ZoneOffset.UTC)
@@ -31,9 +32,9 @@ class InstantToZoneSerializer(
 }
 
 /** ISO 문자열 -> Instant (요청 바디 수신 시) */
-class InstantFromIsoDeserializer : JsonDeserializer<Instant>() {
-    override fun deserialize(p: com.fasterxml.jackson.core.JsonParser, ctxt: DeserializationContext): Instant {
-        val s = p.text
+class InstantFromIsoDeserializer : ValueDeserializer<Instant>() {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): Instant {
+        val s = p.getString()
         return runCatching { OffsetDateTime.parse(s).toInstant() }
             .getOrElse { Instant.parse(s) }
     }
@@ -41,6 +42,9 @@ class InstantFromIsoDeserializer : JsonDeserializer<Instant>() {
 
 /**
  * Jackson에 커스텀 Serializer/Deserializer를 등록하는 설정 클래스
+ *
+ * Spring Boot 4는 Jackson 3.x(tools.jackson.*)를 사용하므로,
+ * ValueSerializer / ValueDeserializer 및 tools.jackson.databind.module.SimpleModule을 사용합니다.
  */
 @Configuration
 class JacksonTimeConfig(private val zoneProvider: ZoneProvider) {
