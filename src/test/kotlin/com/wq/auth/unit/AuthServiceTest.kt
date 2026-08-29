@@ -20,6 +20,7 @@ import com.wq.auth.shared.utils.NicknameGenerator
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.mockito.kotlin.*
 import org.springframework.test.context.ActiveProfiles
 import java.time.Instant
@@ -806,6 +807,48 @@ class AuthServiceTest : DescribeSpec({
             whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore.plusSeconds(1))
 
             authService.assertTokenNotRevoked(token, opaqueId)
+        }
+    }
+    describe("refreshAccessToken - RT 재사용 탐지") {
+
+        val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
+        val jti = "reused-jti"
+        val refreshToken = "any-refresh-token"
+
+        it("이미 회전되어 폐기된 jti가 다시 오면 패밀리 전체를 폐기하고 예외를 던진다") {
+            // 도난된 RT 를 공격자가 먼저 쓰면, 정상 사용자의 다음 갱신에서 이 분기를 탄다.
+            val member = MemberEntity.create(nickname = "피해자")
+            val usedToken: RefreshTokenEntity = mock()
+
+            whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
+            whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
+            whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(null)
+            whenever(refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti))
+                .thenReturn(usedToken)
+            whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(member))
+
+            shouldThrow<JwtException> {
+                authService.refreshAccessToken(refreshToken, deviceId = null)
+            }
+
+            // 계정이 탈취된 상황이므로 정상 사용자도 재로그인시키는 것이 옳다.
+            verify(refreshTokenRepository, times(1)).softDeleteAllByOpaqueId(eq(opaqueId), any())
+            member.tokensInvalidBefore shouldNotBe null
+        }
+
+        it("존재한 적 없는 jti면 패밀리를 건드리지 않고 예외만 던진다") {
+            whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
+            whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
+            whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(null)
+            whenever(refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti))
+                .thenReturn(null)
+
+            shouldThrow<JwtException> {
+                authService.refreshAccessToken(refreshToken, deviceId = null)
+            }
+
+            // 단순 오류·만료 토큰까지 패밀리를 폐기하면 정상 사용자를 불필요하게 로그아웃시킨다.
+            verify(refreshTokenRepository, never()).softDeleteAllByOpaqueId(any(), any())
         }
     }
 })

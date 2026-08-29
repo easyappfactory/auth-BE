@@ -187,8 +187,21 @@ class AuthService(
         val jti = jwtProvider.getJti(refreshToken)
         val opaqueId = jwtProvider.getOpaqueId(refreshToken)
 
-        refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)
-            ?: throw JwtException(JwtExceptionCode.MALFORMED)
+        // active 가 없는 이유가 두 가지다. 구분해야 도난을 탐지할 수 있다.
+        if (refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti) == null) {
+            val used = refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti)
+            if (used != null) {
+                // 이미 회전되어 폐기된 jti 가 다시 나타났다 = 도난 정황.
+                // 회전만 하고 탐지가 없으면, 공격자가 먼저 쓴 경우 공격자는 새 토큰 쌍을 얻고
+                // 정상 사용자만 로그아웃되며 아무도 도난 사실을 모른다.
+                // 계정이 탈취된 상황이므로 정상 사용자도 재로그인시키는 것이 옳다.
+                log.warn { "RT 재사용 감지: opaqueId=$opaqueId jti=$jti" }
+                refreshTokenRepository.softDeleteAllByOpaqueId(opaqueId, Instant.now())
+                memberRepository.findByOpaqueId(opaqueId).ifPresent { it.revokeTokens() }
+                // TODO: 보안 알림 채널로 통지 — 전송 대상 미정(운영 협의 필요)
+            }
+            throw JwtException(JwtExceptionCode.MALFORMED)
+        }
 
         if (jwtProvider.getRefreshTokenExpiredAt(refreshToken).isBefore(Instant.now())) {
             refreshTokenRepository.softDeleteByOpaqueIdAndJti(opaqueId, jti, Instant.now())
