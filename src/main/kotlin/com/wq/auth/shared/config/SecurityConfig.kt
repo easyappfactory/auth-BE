@@ -57,7 +57,6 @@ class SecurityConfig(
                         "/api/v1/auth/email/request", // 이메일 인증 코드 요청
                         "/api/v1/auth/email/verify", // 이메일 인증 코드 검증 (로그인 전 호출)
                         "/api/v1/auth/members/refresh", // 액세스 토큰 재발급
-                        "/api/public/**",         // 공개 API
                         "/api/v1/auth/*/login", // 소셜 로그인 API (V1)
                         "/api/v1/auth/google/login/app", // 안드로이드 앱 전용 Google ID Token 로그인
                         "/api/v2/auth/*/login", // 소셜 로그인 API (V2)

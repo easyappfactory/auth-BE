@@ -59,8 +59,14 @@ class JwtSpringSecurityIntegrationTest : BehaviorSpec() {
 
             `when`("공개 API에 토큰 없이 접근하면") {
                 then("200 OK 응답을 받아야 한다") {
+                    // permitAll 경로. 과거에는 TestSecurityController 의 /api/public/test 를 썼으나
+                    // 그 컨트롤러가 인증 없이 임의 사용자 AT 를 발급해 삭제되면서 옮겼다.
+                    //
+                    // /actuator/health 는 쓰지 않는다 — 테스트 환경에서 health 인디케이터가 DOWN 이라
+                    // 503 이 나서 "보안 통과 여부"가 아니라 "인프라 상태"를 재는 테스트가 되어 버린다.
+                    // /v3/api-docs 는 permitAll 이면서 외부 의존이 없어 결과가 안정적이다.
                     val result = mockMvc.perform(
-                        get("/api/public/test")
+                        get("/v3/api-docs")
                             .contentType(MediaType.APPLICATION_JSON)
                     ).andReturn()
 
@@ -75,8 +81,10 @@ class JwtSpringSecurityIntegrationTest : BehaviorSpec() {
                         opaqueId = "550e8400-e29b-41d4-a716-446655440000"
                     )
 
+                    // 인증 필요 경로. 삭제된 TestSecurityController 의 /api/test 대신
+                    // 토큰을 발급하지 않는 테스트 전용 프로브(_SecurityProbeController)를 쓴다.
                     val result = mockMvc.perform(
-                        get("/api/test")
+                        get("/api/test-probe/authenticated")
                             .header("Authorization", "Bearer $memberToken")
                             .contentType(MediaType.APPLICATION_JSON)
                     ).andReturn()
