@@ -98,6 +98,11 @@ class MemberService(
             )
         )
 
+        // 회원 행은 바로 아래에서 삭제되지만, 삭제 트랜잭션 커밋 전후의 짧은 창과
+        // 게이트웨이 introspect 캐시 때문에 폐기 시각도 함께 남긴다.
+        // 삭제된 이후의 판정은 introspect 의 "회원 부재 = 폐기" 규칙이 담당한다.
+        member.revokeTokens()
+
         refreshTokenRepository.deleteByMember(member)
         authProviderRepository.deleteByMember(member)
         memberRepository.delete(member)

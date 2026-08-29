@@ -140,6 +140,10 @@ class AuthService(
             val opaqueId = jwtProvider.getOpaqueId(refreshToken)
             val jti = jwtProvider.getJti(refreshToken)
             refreshTokenRepository.softDeleteByOpaqueIdAndJti(opaqueId, jti, Instant.now())
+            // RT 만 지우면 AT 는 만료(30분)까지 그대로 유효하다.
+            // 폐기 시각을 남겨 introspect 가 옛 AT 를 거부하게 한다.
+            // @Transactional 이라 dirty checking 으로 반영된다 — save() 불필요.
+            memberRepository.findByOpaqueId(opaqueId).ifPresent { it.revokeTokens() }
         } catch (e: JwtException) {
             log.info { "만료된 refreshToken으로 로그아웃: ${e.message}" }
         } catch (ex: Exception) {
