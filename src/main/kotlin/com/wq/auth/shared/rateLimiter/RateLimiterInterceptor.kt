@@ -37,9 +37,14 @@ class RateLimiterInterceptor(
         val rateLimit = handler.getMethodAnnotation(RateLimit::class.java)
             ?: return true
 
-        // 유저 OpaqueId 가져오기
-        val userOpaqueId = SecurityContextHolder.getContext()
-            .authentication?.name ?: "anonymous"
+        // 버킷 키. 인증된 요청은 opaqueId 를 쓴다.
+        //
+        // 인증 전 요청(만료된 AT 로 introspect → silent refresh)은 SecurityContext 가 비어 있다.
+        // 그대로 "anonymous" 를 쓰면 전 사용자가 버킷 하나(60회/분)를 공유하게 되어,
+        // AT 만료 직후 트래픽이 몰리면 무관한 사용자들이 429 를 맞는다. 그래서 IP 로 나눈다.
+        val bucketKey = SecurityContextHolder.getContext()
+            .authentication?.name
+            ?: clientIpOf(request)
 
         // Duration 변환. 기본은 분
         val duration = when (rateLimit.timeUnit) {
@@ -49,7 +54,7 @@ class RateLimiterInterceptor(
             else -> Duration.ofMinutes(rateLimit.duration)
         }
 
-        return if (rateLimiter.allowRequest(userOpaqueId, rateLimit.limit, duration)) {
+        return if (rateLimiter.allowRequest(bucketKey, rateLimit.limit, duration)) {
             true
         } else {
             //429
@@ -65,8 +70,23 @@ class RateLimiterInterceptor(
 
             response.writer.write(jsonMapper.writeValueAsString(failResponse))
 
-            log.info{"Rate limit exceeded: userOpaqueId=$userOpaqueId, endpoint=${request.requestURI}"}
+            log.info{"Rate limit exceeded: bucketKey=$bucketKey, endpoint=${request.requestURI}"}
             false
         }
     }
+
+    /**
+     * 인증 전 요청의 레이트리밋 버킷 키.
+     *
+     * 이 서비스는 게이트웨이 뒤에 있어 remoteAddr 이 게이트웨이 IP 로 고정된다.
+     * 그러면 다시 전 사용자가 버킷 하나를 공유하게 되므로 X-Forwarded-For 를 먼저 본다.
+     */
+    private fun clientIpOf(request: HttpServletRequest): String =
+        request.getHeader("X-Forwarded-For")
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: request.remoteAddr
+            ?: "anonymous"
 }
