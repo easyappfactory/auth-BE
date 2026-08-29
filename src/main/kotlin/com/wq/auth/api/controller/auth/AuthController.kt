@@ -351,8 +351,12 @@ class AuthController(
                 val deviceId = runCatching { jwtProvider.getClaimsEvenIfExpired(token)["deviceId"] as? String }.getOrNull()
                 silentRefresh(request, response, isApp, deviceId)
             } else {
-                // AT 유효
-                jwtProvider.getOpaqueId(token)
+                // AT 유효 — 서명은 맞지만 로그아웃·탈퇴로 폐기됐을 수 있다.
+                // 폐기 확인은 여기서만 한다. silent refresh 경로는 RT 가 softDelete 되어
+                // findActiveByOpaqueIdAndJti 가 먼저 실패하므로 중복 확인이 불필요하다.
+                val id = jwtProvider.getOpaqueId(token)
+                authService.assertTokenNotRevoked(token, id)
+                id
             }
         }
 

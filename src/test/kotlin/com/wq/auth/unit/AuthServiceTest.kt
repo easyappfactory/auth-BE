@@ -748,4 +748,64 @@ class AuthServiceTest : DescribeSpec({
         }
 
     }
+    describe("assertTokenNotRevoked - 토큰 폐기 판정") {
+
+        val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
+        val token = "any-access-token"
+
+        it("회원 행이 없으면(탈퇴) 폐기로 보고 예외를 던진다") {
+            // 탈퇴는 hard delete 라 tokens_invalid_before 를 읽을 수조차 없다.
+            // 행 부재 자체를 폐기 신호로 써야 탈퇴 직후의 옛 AT 를 막을 수 있다.
+            whenever(memberRepository.findTokensInvalidBeforeByOpaqueId(opaqueId))
+                .thenReturn(emptyList())
+
+            val ex = shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+            ex.jwtCode shouldBe JwtExceptionCode.EXPIRED
+        }
+
+        it("폐기 이력이 없으면(null) 통과한다") {
+            whenever(memberRepository.findTokensInvalidBeforeByOpaqueId(opaqueId))
+                .thenReturn(listOf(null))
+
+            authService.assertTokenNotRevoked(token, opaqueId)
+
+            // 폐기 이력이 없으면 iat 를 읽을 필요조차 없다 (핫패스 비용 절약)
+            verify(jwtProvider, never()).getIssuedAt(any())
+        }
+
+        it("폐기 시각보다 이전에 발급된 토큰이면 예외를 던진다") {
+            val invalidBefore = Instant.parse("2026-08-30T12:00:00Z")
+            whenever(memberRepository.findTokensInvalidBeforeByOpaqueId(opaqueId))
+                .thenReturn(listOf(invalidBefore))
+            whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore.minusSeconds(1))
+
+            val ex = shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+            ex.jwtCode shouldBe JwtExceptionCode.EXPIRED
+        }
+
+        it("폐기 시각과 같은 초에 발급된 토큰도 거부한다") {
+            // iat 는 초 단위라, 로그아웃과 같은 초에 발급된 토큰이 살아남으면 안 된다.
+            val invalidBefore = Instant.parse("2026-08-30T12:00:00Z")
+            whenever(memberRepository.findTokensInvalidBeforeByOpaqueId(opaqueId))
+                .thenReturn(listOf(invalidBefore))
+            whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore)
+
+            shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+        }
+
+        it("폐기 시각 이후에 발급된 토큰이면 통과한다") {
+            val invalidBefore = Instant.parse("2026-08-30T12:00:00Z")
+            whenever(memberRepository.findTokensInvalidBeforeByOpaqueId(opaqueId))
+                .thenReturn(listOf(invalidBefore))
+            whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore.plusSeconds(1))
+
+            authService.assertTokenNotRevoked(token, opaqueId)
+        }
+    }
 })
