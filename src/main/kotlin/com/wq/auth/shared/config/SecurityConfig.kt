@@ -51,7 +51,9 @@ class SecurityConfig(
                 auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()  // OPTIONS 요청 허용
                     // 공개 엔드포인트 (인증 불필요)
-                    .requestMatchers("/internal-api/**").permitAll()  // 서비스 간 내부 통신 (X-Internal-Secret으로 보호)
+                    // 서비스 간 내부 통신. Spring Security 는 통과시키되,
+                    // InternalSecretFilter 가 경로 단위로 X-Internal-Secret 을 강제한다.
+                    .requestMatchers("/internal-api/**").permitAll()
                     .requestMatchers(
                         "/api/v1/auth/members/email-login", // 이메일 로그인
                         "/api/v1/auth/email/request", // 이메일 인증 코드 요청
