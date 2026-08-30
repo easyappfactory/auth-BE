@@ -83,6 +83,24 @@ class JwtProvider(
             .id
 
     /**
+     * JWT 토큰에서 발급 시각(iat)을 추출합니다.
+     *
+     * iat 는 JWT 표준상 **초 단위** 정밀도입니다. 폐기 판정에서 이 점이 중요합니다 —
+     * 같은 초에 발급된 토큰까지 거부하려면 호출부가 `iat > invalidBefore` 가 아니라
+     * 그 부정(`!isAfter`)으로 비교해야 합니다.
+     *
+     * 서명을 검증하므로 위조된 토큰이면 예외를 던집니다.
+     *
+     * @param token 대상 JWT 토큰
+     * @return 발급 시각
+     */
+    fun getIssuedAt(token: String): Instant =
+        Jwts.parser().verifyWith(key)
+            .build().parseSignedClaims(token)
+            .payload
+            .issuedAt.toInstant()
+
+    /**
      * JWT 토큰에서 모든 클레임을 추출합니다.
      * @param token 대상 JWT 토큰
      * @return 모든 클레임을 담은 Map

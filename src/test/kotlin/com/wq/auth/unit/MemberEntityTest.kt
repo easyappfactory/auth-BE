@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import java.time.Instant
 import java.util.*
 
 class MemberEntityTest : StringSpec({
@@ -95,5 +96,37 @@ class MemberEntityTest : StringSpec({
         // )
     }
     */
+
+    "새로 만든 회원은 폐기 이력이 없다" {
+        val member = MemberEntity.create(nickname = "테스터")
+
+        member.tokensInvalidBefore shouldBe null
+    }
+
+    "revokeTokens()는 전달한 시각을 폐기 기준으로 기록한다" {
+        // Given
+        val member = MemberEntity.create(nickname = "테스터")
+        val at = Instant.parse("2026-08-30T12:00:00Z")
+
+        // When
+        member.revokeTokens(at)
+
+        // Then
+        member.tokensInvalidBefore shouldBe at
+    }
+
+    "revokeTokens()를 인자 없이 부르면 현재 시각으로 기록한다" {
+        // Given
+        val member = MemberEntity.create(nickname = "테스터")
+        val before = Instant.now().minusSeconds(1)
+
+        // When
+        member.revokeTokens()
+
+        // Then
+        val recorded = member.tokensInvalidBefore
+        recorded shouldNotBe null
+        recorded!!.isAfter(before) shouldBe true
+    }
 })
 

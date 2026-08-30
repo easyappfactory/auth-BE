@@ -8,6 +8,7 @@ import com.wq.auth.api.domain.auth.AuthProviderRepository
 import com.wq.auth.api.domain.auth.AuthService
 import com.wq.auth.api.domain.auth.MemberConnector
 import com.wq.auth.api.domain.member.MemberRepository
+import com.wq.auth.api.domain.member.MemberRevocationState
 import com.wq.auth.api.domain.member.MemberStatsService
 import com.wq.auth.api.domain.auth.RefreshTokenRepository
 import com.wq.auth.api.domain.auth.entity.RefreshTokenEntity
@@ -16,10 +17,12 @@ import com.wq.auth.api.domain.auth.error.AuthExceptionCode
 import com.wq.auth.security.jwt.JwtProvider
 import com.wq.auth.security.jwt.error.JwtException
 import com.wq.auth.security.jwt.error.JwtExceptionCode
+import com.wq.auth.shared.alert.SecurityAlertNotifier
 import com.wq.auth.shared.utils.NicknameGenerator
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.mockito.kotlin.*
 import org.springframework.test.context.ActiveProfiles
 import java.time.Instant
@@ -37,6 +40,7 @@ class AuthServiceTest : DescribeSpec({
     lateinit var nicknameGenerator: NicknameGenerator
     lateinit var memberConnector: MemberConnector
     lateinit var memberStatsService: MemberStatsService
+    lateinit var securityAlertNotifier: SecurityAlertNotifier
 
     beforeEach {
         authProviderRepository = mock()
@@ -47,6 +51,7 @@ class AuthServiceTest : DescribeSpec({
         nicknameGenerator = mock()
         memberConnector = mock()
         memberStatsService = mock()
+        securityAlertNotifier = mock()
 
         authService = AuthService(
             authEmailService = authEmailService,
@@ -57,6 +62,7 @@ class AuthServiceTest : DescribeSpec({
             nicknameGenerator = nicknameGenerator,
             memberConnector = memberConnector,
             memberStatsService = memberStatsService,
+            securityAlertNotifier = securityAlertNotifier,
         )
     }
 
@@ -747,5 +753,171 @@ class AuthServiceTest : DescribeSpec({
             verifyNoInteractions(authEmailService)
         }
 
+    }
+    describe("assertTokenNotRevoked - 토큰 폐기 판정") {
+
+        val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
+        val token = "any-access-token"
+
+        /** 폐기 상태 프로젝션 stub */
+        fun state(isDeleted: Boolean = false, invalidBefore: Instant? = null) =
+            MemberRevocationState(isDeleted = isDeleted, tokensInvalidBefore = invalidBefore)
+
+        it("회원 행이 없으면(탈퇴) 폐기로 보고 예외를 던진다") {
+            // 탈퇴는 hard delete 라 tokens_invalid_before 를 읽을 수조차 없다.
+            // 행 부재 자체를 폐기 신호로 써야 탈퇴 직후의 옛 AT 를 막을 수 있다.
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId)).thenReturn(null)
+
+            val ex = shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+            ex.jwtCode shouldBe JwtExceptionCode.EXPIRED
+        }
+
+        it("soft delete 된 계정이면 폐기로 보고 예외를 던진다") {
+            // 계정 병합(MemberConnector)이 흡수된 회원을 soft delete 한다.
+            // 행이 남으므로 null 로는 구분되지 않는다. 그 신원으로는 더 이상 로그인할 수
+            // 없으므로 이미 발급된 토큰도 무효여야 한다.
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId))
+                .thenReturn(state(isDeleted = true))
+
+            val ex = shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+            ex.jwtCode shouldBe JwtExceptionCode.EXPIRED
+        }
+
+        it("soft delete 된 계정은 폐기 이력이 없어도 거부한다") {
+            // 병합 코드가 revokeTokens() 기록을 빠뜨려도 이 방어선이 막아야 한다.
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId))
+                .thenReturn(state(isDeleted = true, invalidBefore = null))
+
+            shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+            // 폐기 판정이 이미 끝났으므로 토큰을 파싱할 필요가 없다
+            verify(jwtProvider, never()).getIssuedAt(any())
+        }
+
+        it("폐기 이력이 없는 정상 회원은 통과한다") {
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId))
+                .thenReturn(state())
+
+            authService.assertTokenNotRevoked(token, opaqueId)
+
+            // 폐기 이력이 없으면 iat 를 읽을 필요조차 없다 (핫패스 비용 절약)
+            verify(jwtProvider, never()).getIssuedAt(any())
+        }
+
+        it("폐기 시각보다 이전에 발급된 토큰이면 예외를 던진다") {
+            val invalidBefore = Instant.parse("2026-08-30T12:00:00Z")
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId))
+                .thenReturn(state(invalidBefore = invalidBefore))
+            whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore.minusSeconds(1))
+
+            val ex = shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+            ex.jwtCode shouldBe JwtExceptionCode.EXPIRED
+        }
+
+        it("폐기 시각과 같은 초에 발급된 토큰도 거부한다") {
+            // iat 는 초 단위라, 로그아웃과 같은 초에 발급된 토큰이 살아남으면 안 된다.
+            val invalidBefore = Instant.parse("2026-08-30T12:00:00Z")
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId))
+                .thenReturn(state(invalidBefore = invalidBefore))
+            whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore)
+
+            shouldThrow<JwtException> {
+                authService.assertTokenNotRevoked(token, opaqueId)
+            }
+        }
+
+        it("폐기 시각 이후에 발급된 토큰이면 통과한다") {
+            val invalidBefore = Instant.parse("2026-08-30T12:00:00Z")
+            whenever(memberRepository.findRevocationStateByOpaqueId(opaqueId))
+                .thenReturn(state(invalidBefore = invalidBefore))
+            whenever(jwtProvider.getIssuedAt(token)).thenReturn(invalidBefore.plusSeconds(1))
+
+            authService.assertTokenNotRevoked(token, opaqueId)
+        }
+    }
+
+    describe("refreshAccessToken - RT 재사용 탐지") {
+
+        val opaqueId = "550e8400-e29b-41d4-a716-446655440000"
+        val jti = "reused-jti"
+        val refreshToken = "any-refresh-token"
+
+        it("이미 회전되어 폐기된 jti가 다시 오면 패밀리 전체를 폐기하고 예외를 던진다") {
+            // 도난된 RT 를 공격자가 먼저 쓰면, 정상 사용자의 다음 갱신에서 이 분기를 탄다.
+            val member = MemberEntity.create(nickname = "피해자")
+            val usedToken: RefreshTokenEntity = mock()
+            // 유예 창(기본 30초)을 한참 지난 시점에 회전된 토큰 = 도난 정황
+            whenever(usedToken.deletedAt).thenReturn(Instant.now().minusSeconds(600))
+
+            whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
+            whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
+            whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(null)
+            whenever(refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti))
+                .thenReturn(usedToken)
+            whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(member))
+
+            shouldThrow<JwtException> {
+                authService.refreshAccessToken(refreshToken, deviceId = null)
+            }
+
+            // 계정이 탈취된 상황이므로 정상 사용자도 재로그인시키는 것이 옳다.
+            verify(refreshTokenRepository, times(1)).softDeleteAllByOpaqueId(eq(opaqueId), any())
+            member.tokensInvalidBefore shouldNotBe null
+            // 로그에만 남기면 아무도 모른다 — 운영 채널로 알려야 한다
+            verify(securityAlertNotifier, times(1)).refreshTokenReuseDetected(eq(opaqueId), eq(jti), any())
+        }
+
+        it("존재한 적 없는 jti면 패밀리를 건드리지 않고 예외만 던진다") {
+            whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
+            whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
+            whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(null)
+            whenever(refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti))
+                .thenReturn(null)
+
+            shouldThrow<JwtException> {
+                authService.refreshAccessToken(refreshToken, deviceId = null)
+            }
+
+            // 단순 오류·만료 토큰까지 패밀리를 폐기하면 정상 사용자를 불필요하게 로그아웃시킨다.
+            verify(refreshTokenRepository, never()).softDeleteAllByOpaqueId(any(), any())
+        }
+        it("유예 창 안에 회전된 jti 면 도난으로 보지 않고 정상 발급한다") {
+            // AT 잔여 5분 미만 구간에서 페이지가 API 를 여러 개 동시 호출하면
+            // 같은 RT 로 갱신이 겹친다. 여기서 실패시키면 silentRefresh 가 쿠키를 지워
+            // 정상 사용자가 로그아웃된다. 사용자에게 보이지 않아야 하므로 발급까지 이어간다.
+            val member = MemberEntity.create(nickname = "정상사용자")
+            val justRotated: RefreshTokenEntity = mock()
+            whenever(justRotated.deletedAt).thenReturn(Instant.now().minusSeconds(2))
+
+            whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
+            whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
+            whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(null)
+            whenever(refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti))
+                .thenReturn(justRotated)
+            whenever(jwtProvider.getRefreshTokenExpiredAt(refreshToken))
+                .thenReturn(Instant.now().plusSeconds(3600))
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("new-at")
+            whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("new-rt")
+            whenever(jwtProvider.getJti("new-rt")).thenReturn("new-jti")
+            whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(member))
+            whenever(refreshTokenRepository.save(any<RefreshTokenEntity>())).thenReturn(mock<RefreshTokenEntity>())
+
+            val result = authService.refreshAccessToken(refreshToken, deviceId = null)
+
+            result.accessToken shouldBe "new-at"
+            result.refreshToken shouldBe "new-rt"
+            // 패밀리를 폐기하지 않는다 — 폐기하면 사용자가 재로그인해야 한다
+            verify(refreshTokenRepository, never()).softDeleteAllByOpaqueId(any(), any())
+            member.tokensInvalidBefore shouldBe null
+            // 동시 요청까지 경보로 울리면 신호가 오염되어 진짜 도난을 놓친다
+            verify(securityAlertNotifier, never()).refreshTokenReuseDetected(any(), any(), anyOrNull())
+        }
     }
 })

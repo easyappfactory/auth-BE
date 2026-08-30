@@ -22,7 +22,9 @@ import java.time.Duration
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "INTERNAL_API_SECRET=test-internal-secret"
+        "INTERNAL_API_SECRET=test-internal-secret",
+        "INTERNAL_LOGGING_SECRET=test-logging-secret",
+        "SECURITY_ALERT_CHAT_WEBHOOK_URL="
     ]
 )
 @ConfigurationPropertiesScan

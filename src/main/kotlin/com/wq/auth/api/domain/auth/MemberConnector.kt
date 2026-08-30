@@ -125,6 +125,9 @@ class MemberConnector(
         }
 
         // 연동된 회원을 soft delete 처리
+        // 이 신원으로는 더 이상 로그인할 수 없으므로 이미 발급된 토큰도 함께 폐기한다.
+        // (기록하지 않으면 흡수된 opaqueId 의 AT 가 만료까지 계속 통과한다)
+        linkedMember.revokeTokens()
         linkedMember.softDelete()
         memberRepository.save(linkedMember)
 
