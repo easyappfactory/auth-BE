@@ -14,6 +14,7 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import java.time.Duration
+import java.time.Instant
 import java.util.Base64
 import javax.crypto.SecretKey
 
@@ -134,8 +135,37 @@ class JwtProviderTest : StringSpec({
 
     "토큰 유효성 검증이 정상 동작한다" {
         val validToken = provider.createAccessToken("test-user")
-        
+
         // 예외 없이 통과해야 함
         provider.validateOrThrow(validToken)
+    }
+
+    "getIssuedAt()은 발급 시각(iat)을 돌려준다" {
+        val before = Instant.now().minusSeconds(2)
+        val token = provider.createAccessToken("550e8400-e29b-41d4-a716-446655440000")
+        val after = Instant.now().plusSeconds(2)
+
+        val issuedAt = provider.getIssuedAt(token)
+
+        (issuedAt.isAfter(before) && issuedAt.isBefore(after)).shouldBeTrue()
+    }
+
+    "getIssuedAt()의 iat 는 초 단위다 - 폐기 판정이 이 정밀도에 의존한다" {
+        val token = provider.createAccessToken("550e8400-e29b-41d4-a716-446655440000")
+
+        val issuedAt = provider.getIssuedAt(token)
+
+        // JWT 표준상 iat 는 초 단위라 밀리초가 잘린다. 그래서 폐기 판정은
+        // 같은 초에 발급된 토큰까지 거부하도록 "iat > invalidBefore" 가 아닌
+        // "!(iat > invalidBefore)" 형태로 비교해야 한다.
+        issuedAt.nano shouldBe 0
+    }
+
+    "getIssuedAt()은 서명이 위조된 토큰이면 예외를 던진다" {
+        val forged = provider.createAccessToken("test-user").dropLast(4) + "AAAA"
+
+        shouldThrow<Exception> {
+            provider.getIssuedAt(forged)
+        }
     }
 })

@@ -16,7 +16,7 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:authdb}
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD}
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -54,6 +54,19 @@ app:
     domain: ${APP_COOKIE_DOMAIN:localhost}
   internal:
     secret: ${INTERNAL_API_SECRET}
+  auth:
+    # RT 재사용 유예 창(초). 이 시간 안에 회전된 RT 가 다시 오면 동시 요청·재시도로 본다.
+    # 0 이면 유예 없음(정상 사용자가 로그아웃될 수 있다).
+    refresh-reuse-grace-seconds: ${AUTH_REFRESH_REUSE_GRACE_SECONDS:30}
+  alert:
+    # 보안 이벤트 전용 알림 채널. 비어 있으면 전송을 건너뛰고 경고 로그만 남긴다.
+    #
+    # 변수 이름을 GOOGLE_CHAT_WEBHOOK_URL 로 두지 않는다. wedding 저장소가 같은 이름을
+    # 일반 운영 알림(Sentry 변환·캐시 워밍)에 쓰고 있어서, 이름이 같으면 저장소 간에
+    # 값을 옮기다가 보안 경보가 일반 채널로 새거나 그 반대가 되기 쉽다.
+    #
+    # 이 URL 자체가 시크릿이다 — 아는 사람은 누구나 해당 채널에 글을 쓸 수 있다.
+    security-chat-webhook-url: ${SECURITY_ALERT_CHAT_WEBHOOK_URL}
 
 management:
   endpoints:
@@ -71,4 +84,4 @@ project:
   logging:
     enabled: true
     env: ${SPRING_PROFILES_ACTIVE:local}
-    internal-secret: ${INTERNAL_LOGGING_SECRET:default-secret}
+    internal-secret: ${INTERNAL_LOGGING_SECRET}
