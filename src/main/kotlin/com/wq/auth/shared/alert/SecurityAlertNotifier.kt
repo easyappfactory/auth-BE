@@ -27,7 +27,7 @@ import java.time.Instant
 @Component
 class SecurityAlertNotifier(
     private val restClient: RestClient,
-    @Value("\${app.alert.google-chat-webhook-url:}")
+    @Value("\${app.alert.security-chat-webhook-url:}")
     private val webhookUrl: String,
     @Value("\${spring.profiles.active:local}")
     private val environment: String,
@@ -62,7 +62,7 @@ class SecurityAlertNotifier(
     @Async
     fun send(text: String) {
         if (webhookUrl.isBlank()) {
-            log.warn { "보안 알림 미전송 — app.alert.google-chat-webhook-url 이 설정되지 않았습니다." }
+            log.warn { "보안 알림 미전송 — app.alert.security-chat-webhook-url(SECURITY_ALERT_CHAT_WEBHOOK_URL)이 설정되지 않았습니다." }
             return
         }
         try {
