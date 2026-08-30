@@ -54,6 +54,14 @@ app:
     domain: ${APP_COOKIE_DOMAIN:localhost}
   internal:
     secret: ${INTERNAL_API_SECRET}
+  auth:
+    # RT 재사용 유예 창(초). 이 시간 안에 회전된 RT 가 다시 오면 동시 요청·재시도로 본다.
+    # 0 이면 유예 없음(정상 사용자가 로그아웃될 수 있다).
+    refresh-reuse-grace-seconds: ${AUTH_REFRESH_REUSE_GRACE_SECONDS:30}
+  alert:
+    # 보안 이벤트 알림 채널. 비어 있으면 전송을 건너뛰고 경고 로그만 남긴다.
+    # 이 URL 자체가 시크릿이다 — 아는 사람은 누구나 해당 채널에 글을 쓸 수 있다.
+    google-chat-webhook-url: ${GOOGLE_CHAT_WEBHOOK_URL:}
 
 management:
   endpoints:

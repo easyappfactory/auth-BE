@@ -17,6 +17,7 @@ import com.wq.auth.api.domain.auth.error.AuthExceptionCode
 import com.wq.auth.security.jwt.JwtProvider
 import com.wq.auth.security.jwt.error.JwtException
 import com.wq.auth.security.jwt.error.JwtExceptionCode
+import com.wq.auth.shared.alert.SecurityAlertNotifier
 import com.wq.auth.shared.utils.NicknameGenerator
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
@@ -39,6 +40,7 @@ class AuthServiceTest : DescribeSpec({
     lateinit var nicknameGenerator: NicknameGenerator
     lateinit var memberConnector: MemberConnector
     lateinit var memberStatsService: MemberStatsService
+    lateinit var securityAlertNotifier: SecurityAlertNotifier
 
     beforeEach {
         authProviderRepository = mock()
@@ -49,6 +51,7 @@ class AuthServiceTest : DescribeSpec({
         nicknameGenerator = mock()
         memberConnector = mock()
         memberStatsService = mock()
+        securityAlertNotifier = mock()
 
         authService = AuthService(
             authEmailService = authEmailService,
@@ -59,6 +62,7 @@ class AuthServiceTest : DescribeSpec({
             nicknameGenerator = nicknameGenerator,
             memberConnector = memberConnector,
             memberStatsService = memberStatsService,
+            securityAlertNotifier = securityAlertNotifier,
         )
     }
 
@@ -866,6 +870,8 @@ class AuthServiceTest : DescribeSpec({
             // 계정이 탈취된 상황이므로 정상 사용자도 재로그인시키는 것이 옳다.
             verify(refreshTokenRepository, times(1)).softDeleteAllByOpaqueId(eq(opaqueId), any())
             member.tokensInvalidBefore shouldNotBe null
+            // 로그에만 남기면 아무도 모른다 — 운영 채널로 알려야 한다
+            verify(securityAlertNotifier, times(1)).refreshTokenReuseDetected(eq(opaqueId), eq(jti), any())
         }
 
         it("존재한 적 없는 jti면 패밀리를 건드리지 않고 예외만 던진다") {
@@ -910,6 +916,8 @@ class AuthServiceTest : DescribeSpec({
             // 패밀리를 폐기하지 않는다 — 폐기하면 사용자가 재로그인해야 한다
             verify(refreshTokenRepository, never()).softDeleteAllByOpaqueId(any(), any())
             member.tokensInvalidBefore shouldBe null
+            // 동시 요청까지 경보로 울리면 신호가 오염되어 진짜 도난을 놓친다
+            verify(securityAlertNotifier, never()).refreshTokenReuseDetected(any(), any(), anyOrNull())
         }
     }
 })

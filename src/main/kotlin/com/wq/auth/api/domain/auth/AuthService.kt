@@ -15,6 +15,7 @@ import com.wq.auth.api.domain.member.error.MemberExceptionCode
 import com.wq.auth.security.jwt.JwtProvider
 import com.wq.auth.security.jwt.error.JwtException
 import com.wq.auth.security.jwt.error.JwtExceptionCode
+import com.wq.auth.shared.alert.SecurityAlertNotifier
 import com.wq.auth.shared.utils.NicknameGenerator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -33,6 +34,7 @@ class AuthService(
     private val nicknameGenerator: NicknameGenerator,
     private val memberConnector: MemberConnector,
     private val memberStatsService: MemberStatsService,
+    private val securityAlertNotifier: SecurityAlertNotifier,
 
     /**
      * RT 재사용 유예 창(초).
@@ -237,7 +239,9 @@ class AuthService(
                 log.warn { "RT 재사용 감지(도난 정황): opaqueId=$opaqueId jti=$jti rotatedAt=$rotatedAt" }
                 refreshTokenRepository.softDeleteAllByOpaqueId(opaqueId, Instant.now())
                 memberRepository.findByOpaqueId(opaqueId).ifPresent { it.revokeTokens() }
-                // TODO: 보안 알림 채널로 통지 — 전송 대상 미정(운영 협의 필요)
+                // 로그에만 남기면 아무도 모른다. 계정 탈취 정황이므로 운영 채널로 알린다.
+                // 비동기이고 실패해도 예외를 내보내지 않으므로 이 경로를 지연시키지 않는다.
+                securityAlertNotifier.refreshTokenReuseDetected(opaqueId, jti, rotatedAt)
                 throw JwtException(JwtExceptionCode.MALFORMED)
             }
         }
