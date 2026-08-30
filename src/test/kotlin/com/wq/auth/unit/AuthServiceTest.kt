@@ -849,6 +849,8 @@ class AuthServiceTest : DescribeSpec({
             // 도난된 RT 를 공격자가 먼저 쓰면, 정상 사용자의 다음 갱신에서 이 분기를 탄다.
             val member = MemberEntity.create(nickname = "피해자")
             val usedToken: RefreshTokenEntity = mock()
+            // 유예 창(기본 30초)을 한참 지난 시점에 회전된 토큰 = 도난 정황
+            whenever(usedToken.deletedAt).thenReturn(Instant.now().minusSeconds(600))
 
             whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
             whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
@@ -879,6 +881,35 @@ class AuthServiceTest : DescribeSpec({
 
             // 단순 오류·만료 토큰까지 패밀리를 폐기하면 정상 사용자를 불필요하게 로그아웃시킨다.
             verify(refreshTokenRepository, never()).softDeleteAllByOpaqueId(any(), any())
+        }
+        it("유예 창 안에 회전된 jti 면 도난으로 보지 않고 정상 발급한다") {
+            // AT 잔여 5분 미만 구간에서 페이지가 API 를 여러 개 동시 호출하면
+            // 같은 RT 로 갱신이 겹친다. 여기서 실패시키면 silentRefresh 가 쿠키를 지워
+            // 정상 사용자가 로그아웃된다. 사용자에게 보이지 않아야 하므로 발급까지 이어간다.
+            val member = MemberEntity.create(nickname = "정상사용자")
+            val justRotated: RefreshTokenEntity = mock()
+            whenever(justRotated.deletedAt).thenReturn(Instant.now().minusSeconds(2))
+
+            whenever(jwtProvider.getJti(refreshToken)).thenReturn(jti)
+            whenever(jwtProvider.getOpaqueId(refreshToken)).thenReturn(opaqueId)
+            whenever(refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti)).thenReturn(null)
+            whenever(refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti))
+                .thenReturn(justRotated)
+            whenever(jwtProvider.getRefreshTokenExpiredAt(refreshToken))
+                .thenReturn(Instant.now().plusSeconds(3600))
+            whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("new-at")
+            whenever(jwtProvider.createRefreshToken(any(), any())).thenReturn("new-rt")
+            whenever(jwtProvider.getJti("new-rt")).thenReturn("new-jti")
+            whenever(memberRepository.findByOpaqueId(opaqueId)).thenReturn(Optional.of(member))
+            whenever(refreshTokenRepository.save(any<RefreshTokenEntity>())).thenReturn(mock<RefreshTokenEntity>())
+
+            val result = authService.refreshAccessToken(refreshToken, deviceId = null)
+
+            result.accessToken shouldBe "new-at"
+            result.refreshToken shouldBe "new-rt"
+            // 패밀리를 폐기하지 않는다 — 폐기하면 사용자가 재로그인해야 한다
+            verify(refreshTokenRepository, never()).softDeleteAllByOpaqueId(any(), any())
+            member.tokensInvalidBefore shouldBe null
         }
     }
 })

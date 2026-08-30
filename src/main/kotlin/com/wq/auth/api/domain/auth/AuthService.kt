@@ -17,8 +17,10 @@ import com.wq.auth.security.jwt.error.JwtException
 import com.wq.auth.security.jwt.error.JwtExceptionCode
 import com.wq.auth.shared.utils.NicknameGenerator
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.Instant
 
 @Service
@@ -31,6 +33,16 @@ class AuthService(
     private val nicknameGenerator: NicknameGenerator,
     private val memberConnector: MemberConnector,
     private val memberStatsService: MemberStatsService,
+
+    /**
+     * RT 재사용 유예 창(초).
+     *
+     * 이 시간 안에 회전된 RT 가 다시 오면 **도난이 아니라 동시 요청·재시도**로 본다.
+     * 0 으로 두면 유예 없이 즉시 도난으로 판정한다(정상 사용자 로그아웃 위험).
+     * 운영 로그를 보고 조정할 수 있도록 설정값으로 뺐다.
+     */
+    @Value("\${app.auth.refresh-reuse-grace-seconds:30}")
+    private val refreshReuseGraceSeconds: Long = 30,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -195,20 +207,39 @@ class AuthService(
         val jti = jwtProvider.getJti(refreshToken)
         val opaqueId = jwtProvider.getOpaqueId(refreshToken)
 
-        // active 가 없는 이유가 두 가지다. 구분해야 도난을 탐지할 수 있다.
+        // active 가 없는 이유가 세 가지다. 구분해야 도난만 골라낼 수 있다.
         if (refreshTokenRepository.findActiveByOpaqueIdAndJti(opaqueId, jti) == null) {
             val used = refreshTokenRepository.findByOpaqueIdAndJtiIncludingDeleted(opaqueId, jti)
-            if (used != null) {
-                // 이미 회전되어 폐기된 jti 가 다시 나타났다 = 도난 정황.
+                // ① 존재한 적 없는 jti — 잘못된 토큰. 패밀리는 건드리지 않는다.
+                ?: throw JwtException(JwtExceptionCode.MALFORMED)
+
+            val rotatedAt = used.deletedAt
+            val withinGrace = rotatedAt != null &&
+                Duration.between(rotatedAt, Instant.now()).seconds <= refreshReuseGraceSeconds
+
+            if (withinGrace) {
+                // ② 방금 회전된 jti — 동시 요청이나 네트워크 재시도다.
+                //
+                // AT 잔여 5분 미만이면 모든 introspect 가 갱신을 타는데(AT 수명 30분),
+                // 그 구간에 페이지가 API 를 여러 개 동시 호출하면 같은 RT 로 갱신이 겹친다.
+                // 여기서 실패시키면 silentRefresh 가 쿠키를 지워(clearAuthCookies)
+                // **정상 사용자가 로그아웃된다.** 그래서 아래 정상 발급 경로로 이어간다.
+                //
+                // 대가: 유예 창 안에서는 도난 토큰도 통과한다. 다만 공격자가 정상 회전
+                // 직후 몇 초 안에 써야 하므로 창이 매우 좁고, 그 대가로 정상 사용자가
+                // 주기적으로 튕기는 문제를 막는다.
+                log.info { "RT 재사용(유예 창 내) — 동시 요청·재시도로 판단: opaqueId=$opaqueId jti=$jti" }
+            } else {
+                // ③ 한참 전에 폐기된 jti 가 다시 나타났다 = 도난 정황.
                 // 회전만 하고 탐지가 없으면, 공격자가 먼저 쓴 경우 공격자는 새 토큰 쌍을 얻고
                 // 정상 사용자만 로그아웃되며 아무도 도난 사실을 모른다.
                 // 계정이 탈취된 상황이므로 정상 사용자도 재로그인시키는 것이 옳다.
-                log.warn { "RT 재사용 감지: opaqueId=$opaqueId jti=$jti" }
+                log.warn { "RT 재사용 감지(도난 정황): opaqueId=$opaqueId jti=$jti rotatedAt=$rotatedAt" }
                 refreshTokenRepository.softDeleteAllByOpaqueId(opaqueId, Instant.now())
                 memberRepository.findByOpaqueId(opaqueId).ifPresent { it.revokeTokens() }
                 // TODO: 보안 알림 채널로 통지 — 전송 대상 미정(운영 협의 필요)
+                throw JwtException(JwtExceptionCode.MALFORMED)
             }
-            throw JwtException(JwtExceptionCode.MALFORMED)
         }
 
         if (jwtProvider.getRefreshTokenExpiredAt(refreshToken).isBefore(Instant.now())) {
