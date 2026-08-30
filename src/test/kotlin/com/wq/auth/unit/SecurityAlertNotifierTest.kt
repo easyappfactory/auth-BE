@@ -68,6 +68,8 @@ class SecurityAlertNotifierTest : StringSpec({
             // Google Chat 은 text 필드를 요구한다
             body shouldContain "\"text\""
             body shouldContain "RT 재사용 감지"
+            // alpha 와 prod 가 같은 채널을 공유하므로 환경이 제목에 드러나야 한다
+            body shouldContain "[TEST]"
             body shouldContain "550e8400-e29b-41d4-a716-446655440000"
             body shouldContain "stolen-jti"
             body shouldContain "2026-08-30T12:00:00Z"

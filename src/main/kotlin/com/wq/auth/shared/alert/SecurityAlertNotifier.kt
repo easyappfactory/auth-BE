@@ -43,8 +43,9 @@ class SecurityAlertNotifier(
      */
     fun refreshTokenReuseDetected(opaqueId: String, jti: String, rotatedAt: Instant?) {
         val text = buildString {
-            append("🚨 *RT 재사용 감지 — 계정 탈취 정황*\n")
-            append("환경: `$environment`\n")
+            // 환경을 제목 맨 앞에 둔다. alpha 와 prod 가 같은 채널을 공유하므로
+            // 목록에서 훑을 때 어느 환경 사고인지 즉시 구분돼야 한다.
+            append("🚨 *[${environment.uppercase()}] RT 재사용 감지 — 계정 탈취 정황*\n")
             append("사용자: `$opaqueId`\n")
             append("재사용된 jti: `$jti`\n")
             append("해당 jti 회전 시각: `${rotatedAt ?: "알 수 없음"}`\n")
