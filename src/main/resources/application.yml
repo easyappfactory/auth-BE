@@ -16,7 +16,7 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:authdb}
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD}
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -66,7 +66,7 @@ app:
     # 값을 옮기다가 보안 경보가 일반 채널로 새거나 그 반대가 되기 쉽다.
     #
     # 이 URL 자체가 시크릿이다 — 아는 사람은 누구나 해당 채널에 글을 쓸 수 있다.
-    security-chat-webhook-url: ${SECURITY_ALERT_CHAT_WEBHOOK_URL:}
+    security-chat-webhook-url: ${SECURITY_ALERT_CHAT_WEBHOOK_URL}
 
 management:
   endpoints:
@@ -84,4 +84,4 @@ project:
   logging:
     enabled: true
     env: ${SPRING_PROFILES_ACTIVE:local}
-    internal-secret: ${INTERNAL_LOGGING_SECRET:default-secret}
+    internal-secret: ${INTERNAL_LOGGING_SECRET}

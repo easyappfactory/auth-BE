@@ -22,6 +22,8 @@ import java.time.Instant
         "jwt.access-exp=15m",
         "jwt.refresh-exp=14d",
         "INTERNAL_API_SECRET=test-internal-secret",
+        "INTERNAL_LOGGING_SECRET=test-logging-secret",
+        "SECURITY_ALERT_CHAT_WEBHOOK_URL=",
         "spring.datasource.url=jdbc:h2:mem:revocation-state-test;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",

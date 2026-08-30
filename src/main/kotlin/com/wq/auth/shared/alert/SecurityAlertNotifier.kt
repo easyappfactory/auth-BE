@@ -27,7 +27,7 @@ import java.time.Instant
 @Component
 class SecurityAlertNotifier(
     private val restClient: RestClient,
-    @Value("\${app.alert.security-chat-webhook-url:}")
+    @Value("\${app.alert.security-chat-webhook-url}")
     private val webhookUrl: String,
     @Value("\${spring.profiles.active:local}")
     private val environment: String,
