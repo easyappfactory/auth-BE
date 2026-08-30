@@ -131,26 +131,34 @@ class AuthService(
     /**
      * 폐기된 토큰이면 [JwtException]을 던집니다. 유효하면 조용히 반환합니다.
      *
-     * 두 가지를 모두 거릅니다.
-     *   ① **회원 행이 없음** = 탈퇴한 계정. 탈퇴는 hard delete 라 tokens_invalid_before 를
-     *      읽을 수조차 없으므로, 행 부재 자체를 폐기 신호로 씁니다.
-     *      (이 분기가 없으면 탈퇴 직후의 옛 AT 가 만료까지 통과합니다.)
-     *   ② **iat <= tokens_invalid_before** = 로그아웃·탈퇴·RT 재사용 탐지 이전에 발급된 토큰.
+     * 세 가지를 거릅니다. 서명이 유효해도 그 신원이 이미 없어졌을 수 있기 때문입니다.
+     *   ① **회원 행이 없음** = 탈퇴(hard delete)한 계정. `tokens_invalid_before` 를 읽을
+     *      수조차 없으므로 행 부재 자체를 폐기 신호로 씁니다.
+     *   ② **soft delete 된 계정** = 계정 병합으로 흡수된 회원([MemberConnector]).
+     *      행은 남지만 그 신원으로는 더 이상 로그인할 수 없으므로 토큰도 무효여야 합니다.
+     *   ③ **iat <= tokens_invalid_before** = 로그아웃·탈퇴·RT 재사용 탐지 이전 발급분.
+     *
+     * ②는 병합 시점에도 [MemberEntity.revokeTokens] 로 기록하지만, 여기서도 확인합니다.
+     * 앞으로 soft delete 를 쓰는 코드가 기록을 빠뜨려도 이 방어선이 막습니다.
      *
      * iat 는 초 단위 정밀도라 같은 초에 발급된 토큰도 거부해야 합니다 —
      * 그래서 `isAfter` 의 부정으로 비교합니다.
      *
      * **성능** — introspect 의 AT 유효 경로에서 호출되므로 DB 읽기가 하나 추가됩니다.
-     * opaque_id unique 인덱스 단일 조회이고, 게이트웨이 introspect 캐시가 앞단에서
-     * 대부분을 막아 실제로는 캐시 미스에서만 발생합니다.
+     * opaque_id unique 인덱스 단일 조회이고 컬럼 두 개만 읽습니다. 게이트웨이
+     * introspect 캐시가 앞단에서 대부분을 막아 실제로는 캐시 미스에서만 발생합니다.
      */
     fun assertTokenNotRevoked(token: String, opaqueId: String) {
-        val rows = memberRepository.findTokensInvalidBeforeByOpaqueId(opaqueId)
-        if (rows.isEmpty()) {
+        val state = memberRepository.findRevocationStateByOpaqueId(opaqueId)
+        if (state == null) {
             log.info { "폐기된 토큰: 회원 없음(탈퇴) opaqueId=$opaqueId" }
             throw JwtException(JwtExceptionCode.EXPIRED)
         }
-        val invalidBefore = rows.first() ?: return   // 폐기 이력 없음 — 정상
+        if (state.isDeleted) {
+            log.info { "폐기된 토큰: 삭제된 계정(병합 등) opaqueId=$opaqueId" }
+            throw JwtException(JwtExceptionCode.EXPIRED)
+        }
+        val invalidBefore = state.tokensInvalidBefore ?: return   // 폐기 이력 없음 — 정상
         if (!jwtProvider.getIssuedAt(token).isAfter(invalidBefore)) {
             log.info { "폐기된 토큰: 폐기 시각 이전 발급 opaqueId=$opaqueId" }
             throw JwtException(JwtExceptionCode.EXPIRED)
