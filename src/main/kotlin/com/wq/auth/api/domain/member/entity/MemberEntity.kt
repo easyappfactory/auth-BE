@@ -90,7 +90,8 @@ open class MemberEntity protected constructor(
                 nickname = nickname.trim(),
                 isEmailVerified = isEmailVerified,
                 primaryEmail = primaryEmail,
-                phoneNumber = phoneNumber
+                phoneNumber = phoneNumber,
+                lastLoginAt = LocalDateTime.now(),
             )
         }
     }

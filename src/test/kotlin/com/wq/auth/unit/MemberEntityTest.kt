@@ -86,6 +86,17 @@ class MemberEntityTest : StringSpec({
         member.phoneNumber shouldBe null
     }
 
+    "createSocialMember는 생성 시각을 lastLoginAt으로 기록한다" {
+        // Given & When
+        val member = MemberEntity.createSocialMember(
+            nickname = "테스트",
+            primaryEmail = "test@naver.com"
+        )
+
+        // Then
+        member.lastLoginAt shouldNotBe null
+    }
+
     /*
     // 다음 코드는 컴파일 에러가 발생해야 함 (protected constructor)
     "외부에서 직접 생성자 호출 시도" {
