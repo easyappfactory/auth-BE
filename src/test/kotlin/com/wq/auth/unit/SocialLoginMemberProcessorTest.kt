@@ -6,12 +6,12 @@ import com.wq.auth.api.domain.auth.SocialLoginMemberProcessor
 import com.wq.auth.api.domain.auth.entity.AuthProviderEntity
 import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.member.MemberRepository
-import com.wq.auth.api.domain.member.MemberStatsService
 import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.oauth.OAuthUser
 import com.wq.auth.security.jwt.JwtProvider
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.mockito.kotlin.*
 
 class SocialLoginMemberProcessorTest : DescribeSpec({
@@ -20,7 +20,6 @@ class SocialLoginMemberProcessorTest : DescribeSpec({
     lateinit var memberRepository: MemberRepository
     lateinit var jwtProvider: JwtProvider
     lateinit var refreshTokenRepository: RefreshTokenRepository
-    lateinit var memberStatsService: MemberStatsService
     lateinit var processor: SocialLoginMemberProcessor
 
     fun naverOAuthUser(phoneNumber: String?) = OAuthUser(
@@ -38,13 +37,11 @@ class SocialLoginMemberProcessorTest : DescribeSpec({
         memberRepository = mock()
         jwtProvider = mock()
         refreshTokenRepository = mock()
-        memberStatsService = mock()
         processor = SocialLoginMemberProcessor(
             authProviderRepository,
             memberRepository,
             jwtProvider,
             refreshTokenRepository,
-            memberStatsService,
         )
 
         whenever(jwtProvider.createAccessToken(any(), any())).thenReturn("access-token")
@@ -78,6 +75,8 @@ class SocialLoginMemberProcessorTest : DescribeSpec({
                 primaryEmail = "test@naver.com",
                 phoneNumber = "01011112222"
             )
+            val before = existingMember.lastLoginAt
+            Thread.sleep(2)
             val existingAuthProvider = mock<AuthProviderEntity>()
             whenever(existingAuthProvider.member).thenReturn(existingMember)
             whenever(authProviderRepository.findByProviderIdAndProviderType(any(), any()))
@@ -90,6 +89,7 @@ class SocialLoginMemberProcessorTest : DescribeSpec({
 
             // then
             existingMember.phoneNumber shouldBe "01099998888"
+            existingMember.lastLoginAt shouldNotBe before
             verify(memberRepository).save(existingMember)
         }
 
