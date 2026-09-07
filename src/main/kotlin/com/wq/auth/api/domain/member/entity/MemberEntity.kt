@@ -3,10 +3,18 @@ package com.wq.auth.api.domain.member.entity
 import com.wq.auth.shared.entity.BaseEntity
 import com.github.f4b6a3.uuid.UuidCreator
 import jakarta.persistence.*
+import org.hibernate.annotations.DynamicUpdate
 import java.time.Instant
-import java.time.LocalDateTime
 
+/**
+ * 회원 엔티티.
+ *
+ * `@DynamicUpdate` 인 이유: 로그인 트랜잭션이 `last_login_at` 하나만 바꾸는데
+ * 전체 컬럼을 쓰면, 동시에 일어난 로그아웃이 기록한 `tokens_invalid_before` 를
+ * 로그인 시작 시점에 읽은 낡은 값으로 덮어쓸 수 있다. 변경된 컬럼만 UPDATE 한다.
+ */
 @Entity
+@DynamicUpdate
 @Table(
     name = "member",
     indexes = [
@@ -33,8 +41,12 @@ open class MemberEntity protected constructor(
     @Column(name = "is_email_verified", nullable = false)
     var isEmailVerified: Boolean = false,
 
+    /**
+     * 사용자가 직접 인증한 마지막 시각(이메일 코드 인증·소셜 로그인·계정 연동).
+     * 토큰 재발급에서는 갱신하지 않는다. 다른 시각 컬럼과 같이 UTC Instant 로 저장한다.
+     */
     @Column(name = "last_login_at")
-    var lastLoginAt: LocalDateTime? = null,
+    var lastLoginAt: Instant? = null,
 
     //TODO
     //회원 삭제 기능 개발시 모든 쿼리 is_deleted 확인 추가
@@ -61,7 +73,7 @@ open class MemberEntity protected constructor(
                 isEmailVerified = true,
                 primaryEmail = email,
                 opaqueId = UuidCreator.getTimeOrdered().toString(),
-                lastLoginAt = LocalDateTime.now(),
+                lastLoginAt = Instant.now(),
             )
 
         fun create(
@@ -90,7 +102,8 @@ open class MemberEntity protected constructor(
                 nickname = nickname.trim(),
                 isEmailVerified = isEmailVerified,
                 primaryEmail = primaryEmail,
-                phoneNumber = phoneNumber
+                phoneNumber = phoneNumber,
+                lastLoginAt = Instant.now(),
             )
         }
     }
@@ -113,7 +126,7 @@ open class MemberEntity protected constructor(
      * 최근 로그인 시간 업데이트
      */
     fun updateLastLoginAt() {
-        this.lastLoginAt = LocalDateTime.now()
+        this.lastLoginAt = Instant.now()
     }
 
     /**

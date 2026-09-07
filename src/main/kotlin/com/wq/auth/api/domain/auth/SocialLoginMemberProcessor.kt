@@ -5,7 +5,6 @@ import com.wq.auth.api.domain.auth.entity.ProviderType
 import com.wq.auth.api.domain.auth.entity.RefreshTokenEntity
 import com.wq.auth.api.domain.auth.response.SocialLoginResult
 import com.wq.auth.api.domain.member.MemberRepository
-import com.wq.auth.api.domain.member.MemberStatsService
 import com.wq.auth.api.domain.member.entity.MemberEntity
 import com.wq.auth.api.domain.oauth.OAuthUser
 import com.wq.auth.security.jwt.JwtProvider
@@ -19,7 +18,6 @@ class SocialLoginMemberProcessor(
     private val memberRepository: MemberRepository,
     private val jwtProvider: JwtProvider,
     private val refreshTokenRepository: RefreshTokenRepository,
-    private val memberStatsService: MemberStatsService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -29,7 +27,11 @@ class SocialLoginMemberProcessor(
 
         createOrUpdateAuthProvider(member, oauthUser, providerType)
 
-        memberStatsService.updateLastLoginAtAsync(member.id)
+        // 신규 회원은 생성 시점에 lastLoginAt 이 채워지므로 기존 회원만 갱신한다.
+        // 같은 트랜잭션 안에서 dirty checking 으로 커밋된다.
+        if (!isNewMember) {
+            member.updateLastLoginAt()
+        }
 
         val accessToken = jwtProvider.createAccessToken(member.opaqueId)
         val refreshToken = jwtProvider.createRefreshToken(member.opaqueId)

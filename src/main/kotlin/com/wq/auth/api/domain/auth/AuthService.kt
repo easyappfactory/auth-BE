@@ -9,7 +9,6 @@ import com.wq.auth.api.domain.auth.error.AuthException
 import com.wq.auth.api.domain.auth.error.AuthExceptionCode
 import com.wq.auth.api.domain.auth.request.EmailLoginLinkRequest
 import com.wq.auth.api.domain.member.MemberRepository
-import com.wq.auth.api.domain.member.MemberStatsService
 import com.wq.auth.api.domain.member.error.MemberException
 import com.wq.auth.api.domain.member.error.MemberExceptionCode
 import com.wq.auth.security.jwt.JwtProvider
@@ -33,7 +32,6 @@ class AuthService(
     private val jwtProvider: JwtProvider,
     private val nicknameGenerator: NicknameGenerator,
     private val memberConnector: MemberConnector,
-    private val memberStatsService: MemberStatsService,
     private val securityAlertNotifier: SecurityAlertNotifier,
 
     /**
@@ -76,7 +74,8 @@ class AuthService(
             val refreshTokenEntity = RefreshTokenEntity.of(existingUser, jti, opaqueId, deviceId)
             refreshTokenRepository.save(refreshTokenEntity)
             
-            memberStatsService.updateLastLoginAtAsync(existingUser.id)
+            // 같은 트랜잭션 안에서 dirty checking 으로 커밋된다.
+            existingUser.updateLastLoginAt()
 
             return TokenResult(accessToken, refreshToken)
         }
