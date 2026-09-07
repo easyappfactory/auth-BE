@@ -54,16 +54,9 @@ class LastLoginAtUpdateTest : StringSpec() {
     @Autowired lateinit var memberRepository: MemberRepository
     @Autowired lateinit var authProviderRepository: AuthProviderRepository
 
-    /** 비동기 갱신을 기다렸다가 DB 에서 다시 읽는다. 최대 3초. */
-    private fun awaitLastLoginAt(memberId: Long): LocalDateTime? {
-        val deadline = System.currentTimeMillis() + 3_000
-        while (System.currentTimeMillis() < deadline) {
-            val value = memberRepository.findById(memberId).orElseThrow().lastLoginAt
-            if (value != null) return value
-            Thread.sleep(50)
-        }
-        return memberRepository.findById(memberId).orElseThrow().lastLoginAt
-    }
+    /** DB 에서 다시 읽는다. 갱신은 로그인 트랜잭션 안에서 끝나므로 대기가 필요 없다. */
+    private fun lastLoginAtOf(memberId: Long): LocalDateTime? =
+        memberRepository.findById(memberId).orElseThrow().lastLoginAt
 
     init {
         "기존 이메일 회원 로그인 → last_login_at 기록" {
@@ -72,9 +65,10 @@ class LastLoginAtUpdateTest : StringSpec() {
             authProviderRepository.save(AuthProviderEntity.createEmailProvider(member, email))
             member.lastLoginAt shouldBe null
 
+            val before = LocalDateTime.now()
             authService.emailLogin(email, deviceId = "dev-1")
 
-            awaitLastLoginAt(member.id).shouldNotBeNull()
+            lastLoginAtOf(member.id).shouldNotBeNull().isAfter(before) shouldBe true
         }
 
         "기존 소셜 회원 로그인(전화번호 변경 없음) → last_login_at 기록" {
@@ -83,12 +77,13 @@ class LastLoginAtUpdateTest : StringSpec() {
                 AuthProviderEntity(member = member, providerType = ProviderType.KAKAO, providerId = "kakao-1", email = "k1@test.com")
             )
 
+            val before = LocalDateTime.now()
             socialLoginMemberProcessor.processMemberAndIssueTokens(
                 OAuthUser(providerId = "kakao-1", email = "k1@test.com", verifiedEmail = true, name = "소셜회원", providerType = ProviderType.KAKAO),
                 ProviderType.KAKAO,
             )
 
-            awaitLastLoginAt(member.id).shouldNotBeNull()
+            lastLoginAtOf(member.id).shouldNotBeNull().isAfter(before) shouldBe true
         }
 
         "기존 소셜 회원 로그인(전화번호 변경) → last_login_at 기록" {
@@ -97,24 +92,38 @@ class LastLoginAtUpdateTest : StringSpec() {
                 AuthProviderEntity(member = member, providerType = ProviderType.NAVER, providerId = "naver-1", email = "n1@test.com")
             )
 
+            val before = LocalDateTime.now()
             socialLoginMemberProcessor.processMemberAndIssueTokens(
                 OAuthUser(providerId = "naver-1", email = "n1@test.com", verifiedEmail = true, name = "소셜회원2", phoneNumber = "010-1234-5678", providerType = ProviderType.NAVER),
                 ProviderType.NAVER,
             )
 
-            val reloaded = awaitLastLoginAt(member.id)
-            reloaded.shouldNotBeNull()
+            lastLoginAtOf(member.id).shouldNotBeNull().isAfter(before) shouldBe true
             memberRepository.findById(member.id).orElseThrow().phoneNumber shouldBe "010-1234-5678"
         }
 
         "신규 소셜 회원 가입 로그인 → last_login_at 기록" {
+            val before = LocalDateTime.now()
             socialLoginMemberProcessor.processMemberAndIssueTokens(
                 OAuthUser(providerId = "google-new", email = "new@test.com", verifiedEmail = true, name = "신규소셜", providerType = ProviderType.GOOGLE),
                 ProviderType.GOOGLE,
             )
             val member = authProviderRepository.findByProviderIdAndProviderType("google-new", ProviderType.GOOGLE)!!.member
 
-            awaitLastLoginAt(member.id).shouldNotBeNull()
+            lastLoginAtOf(member.id).shouldNotBeNull().isAfter(before) shouldBe true
+        }
+
+        "토큰 재발급은 last_login_at 을 갱신하지 않는다" {
+            val email = "refresh-no-touch@test.com"
+            val member = memberRepository.save(MemberEntity.create(nickname = "재발급회원"))
+            authProviderRepository.save(AuthProviderEntity.createEmailProvider(member, email))
+
+            val loginResult = authService.emailLogin(email, deviceId = "dev-1")
+            val afterLogin = lastLoginAtOf(member.id).shouldNotBeNull()
+
+            authService.refreshAccessToken(loginResult.refreshToken, deviceId = "dev-1")
+
+            lastLoginAtOf(member.id) shouldBe afterLogin
         }
     }
 }
