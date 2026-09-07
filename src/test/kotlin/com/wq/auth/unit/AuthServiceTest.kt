@@ -9,7 +9,6 @@ import com.wq.auth.api.domain.auth.AuthService
 import com.wq.auth.api.domain.auth.MemberConnector
 import com.wq.auth.api.domain.member.MemberRepository
 import com.wq.auth.api.domain.member.MemberRevocationState
-import com.wq.auth.api.domain.member.MemberStatsService
 import com.wq.auth.api.domain.auth.RefreshTokenRepository
 import com.wq.auth.api.domain.auth.entity.RefreshTokenEntity
 import com.wq.auth.api.domain.auth.error.AuthException
@@ -39,7 +38,6 @@ class AuthServiceTest : DescribeSpec({
     lateinit var jwtProvider: JwtProvider
     lateinit var nicknameGenerator: NicknameGenerator
     lateinit var memberConnector: MemberConnector
-    lateinit var memberStatsService: MemberStatsService
     lateinit var securityAlertNotifier: SecurityAlertNotifier
 
     beforeEach {
@@ -50,7 +48,6 @@ class AuthServiceTest : DescribeSpec({
         jwtProvider = mock()
         nicknameGenerator = mock()
         memberConnector = mock()
-        memberStatsService = mock()
         securityAlertNotifier = mock()
 
         authService = AuthService(
@@ -61,7 +58,6 @@ class AuthServiceTest : DescribeSpec({
             jwtProvider = jwtProvider,
             nicknameGenerator = nicknameGenerator,
             memberConnector = memberConnector,
-            memberStatsService = memberStatsService,
             securityAlertNotifier = securityAlertNotifier,
         )
     }
@@ -107,6 +103,7 @@ class AuthServiceTest : DescribeSpec({
             verify(jwtProvider).createAccessToken(any(), any())
             verify(jwtProvider).createRefreshToken(any(), any())
             verify(refreshTokenRepository, times(1)).save(any<RefreshTokenEntity>())
+            verify(mockMember).updateLastLoginAt()
         }
 
         it("유효한 refreshToken이 주어졌을 때 새로운 토큰들을 생성하고 반환해야 한다 - App") {
