@@ -12,7 +12,8 @@ import com.wq.auth.security.jwt.JwtProvider
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import org.mockito.kotlin.*
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 class SocialLoginMemberProcessorTest : DescribeSpec({
 
@@ -75,7 +76,7 @@ class SocialLoginMemberProcessorTest : DescribeSpec({
                 primaryEmail = "test@naver.com",
                 phoneNumber = "01011112222"
             )
-            val before = LocalDateTime.now().minusDays(1)
+            val before = Instant.now().minus(1, ChronoUnit.DAYS)
             existingMember.lastLoginAt = before
             val existingAuthProvider = mock<AuthProviderEntity>()
             whenever(existingAuthProvider.member).thenReturn(existingMember)

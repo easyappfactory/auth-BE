@@ -5,7 +5,6 @@ import com.github.f4b6a3.uuid.UuidCreator
 import jakarta.persistence.*
 import org.hibernate.annotations.DynamicUpdate
 import java.time.Instant
-import java.time.LocalDateTime
 
 /**
  * 회원 엔티티.
@@ -42,8 +41,12 @@ open class MemberEntity protected constructor(
     @Column(name = "is_email_verified", nullable = false)
     var isEmailVerified: Boolean = false,
 
+    /**
+     * 사용자가 직접 인증한 마지막 시각(이메일 코드 인증·소셜 로그인·계정 연동).
+     * 토큰 재발급에서는 갱신하지 않는다. 다른 시각 컬럼과 같이 UTC Instant 로 저장한다.
+     */
     @Column(name = "last_login_at")
-    var lastLoginAt: LocalDateTime? = null,
+    var lastLoginAt: Instant? = null,
 
     //TODO
     //회원 삭제 기능 개발시 모든 쿼리 is_deleted 확인 추가
@@ -70,7 +73,7 @@ open class MemberEntity protected constructor(
                 isEmailVerified = true,
                 primaryEmail = email,
                 opaqueId = UuidCreator.getTimeOrdered().toString(),
-                lastLoginAt = LocalDateTime.now(),
+                lastLoginAt = Instant.now(),
             )
 
         fun create(
@@ -100,7 +103,7 @@ open class MemberEntity protected constructor(
                 isEmailVerified = isEmailVerified,
                 primaryEmail = primaryEmail,
                 phoneNumber = phoneNumber,
-                lastLoginAt = LocalDateTime.now(),
+                lastLoginAt = Instant.now(),
             )
         }
     }
@@ -123,7 +126,7 @@ open class MemberEntity protected constructor(
      * 최근 로그인 시간 업데이트
      */
     fun updateLastLoginAt() {
-        this.lastLoginAt = LocalDateTime.now()
+        this.lastLoginAt = Instant.now()
     }
 
     /**

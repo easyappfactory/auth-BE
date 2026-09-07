@@ -14,7 +14,7 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import java.time.LocalDateTime
+import java.time.Instant
 
 /**
  * 로그인 시 last_login_at 이 실제 DB 에 커밋되는지 검증한다.
@@ -55,7 +55,7 @@ class LastLoginAtUpdateTest : StringSpec() {
     @Autowired lateinit var authProviderRepository: AuthProviderRepository
 
     /** DB 에서 다시 읽는다. 갱신은 로그인 트랜잭션 안에서 끝나므로 대기가 필요 없다. */
-    private fun lastLoginAtOf(memberId: Long): LocalDateTime? =
+    private fun lastLoginAtOf(memberId: Long): Instant? =
         memberRepository.findById(memberId).orElseThrow().lastLoginAt
 
     init {
@@ -65,7 +65,7 @@ class LastLoginAtUpdateTest : StringSpec() {
             authProviderRepository.save(AuthProviderEntity.createEmailProvider(member, email))
             member.lastLoginAt shouldBe null
 
-            val before = LocalDateTime.now()
+            val before = Instant.now()
             authService.emailLogin(email, deviceId = "dev-1")
 
             lastLoginAtOf(member.id).shouldNotBeNull().isAfter(before) shouldBe true
@@ -77,7 +77,7 @@ class LastLoginAtUpdateTest : StringSpec() {
                 AuthProviderEntity(member = member, providerType = ProviderType.KAKAO, providerId = "kakao-1", email = "k1@test.com")
             )
 
-            val before = LocalDateTime.now()
+            val before = Instant.now()
             socialLoginMemberProcessor.processMemberAndIssueTokens(
                 OAuthUser(providerId = "kakao-1", email = "k1@test.com", verifiedEmail = true, name = "소셜회원", providerType = ProviderType.KAKAO),
                 ProviderType.KAKAO,
@@ -92,7 +92,7 @@ class LastLoginAtUpdateTest : StringSpec() {
                 AuthProviderEntity(member = member, providerType = ProviderType.NAVER, providerId = "naver-1", email = "n1@test.com")
             )
 
-            val before = LocalDateTime.now()
+            val before = Instant.now()
             socialLoginMemberProcessor.processMemberAndIssueTokens(
                 OAuthUser(providerId = "naver-1", email = "n1@test.com", verifiedEmail = true, name = "소셜회원2", phoneNumber = "010-1234-5678", providerType = ProviderType.NAVER),
                 ProviderType.NAVER,
@@ -103,7 +103,7 @@ class LastLoginAtUpdateTest : StringSpec() {
         }
 
         "신규 소셜 회원 가입 로그인 → last_login_at 기록" {
-            val before = LocalDateTime.now()
+            val before = Instant.now()
             socialLoginMemberProcessor.processMemberAndIssueTokens(
                 OAuthUser(providerId = "google-new", email = "new@test.com", verifiedEmail = true, name = "신규소셜", providerType = ProviderType.GOOGLE),
                 ProviderType.GOOGLE,
