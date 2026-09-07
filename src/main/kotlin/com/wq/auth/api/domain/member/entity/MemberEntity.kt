@@ -3,10 +3,19 @@ package com.wq.auth.api.domain.member.entity
 import com.wq.auth.shared.entity.BaseEntity
 import com.github.f4b6a3.uuid.UuidCreator
 import jakarta.persistence.*
+import org.hibernate.annotations.DynamicUpdate
 import java.time.Instant
 import java.time.LocalDateTime
 
+/**
+ * 회원 엔티티.
+ *
+ * `@DynamicUpdate` 인 이유: 로그인 트랜잭션이 `last_login_at` 하나만 바꾸는데
+ * 전체 컬럼을 쓰면, 동시에 일어난 로그아웃이 기록한 `tokens_invalid_before` 를
+ * 로그인 시작 시점에 읽은 낡은 값으로 덮어쓸 수 있다. 변경된 컬럼만 UPDATE 한다.
+ */
 @Entity
+@DynamicUpdate
 @Table(
     name = "member",
     indexes = [
